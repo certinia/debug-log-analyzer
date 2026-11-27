@@ -4,7 +4,7 @@
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
-} from '../../core/messaging/VSCodeExtensionMessenger.js';
+} from '#core/messaging/VSCodeExtensionMessenger.js';
 
 export type LanaSettings = {
   timeline: {
@@ -33,10 +33,15 @@ export type LanaSettings = {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
+  /** The VS Code look the chrome follows; absent from a host that is not VS Code. */
+  ui?: { mode: 'modern' | 'classic' };
   // The app-wide inspector, fed by a selection on any tab.
   inspector: {
     position: 'left' | 'right' | 'bottom';
-    size: number;
+    /** Width docked left or right, in px; `null` means never dragged, so the panel takes its default size. */
+    sideSize: number | null;
+    /** Height docked at the bottom, like `sideSize`. */
+    bottomSize: number | null;
     /** Collapsed sections, keyed `<source>:<scope>:<section id>`. */
     collapsed: Record<string, boolean>;
     /** The order the user arranged each list in, keyed `<source>:<scope>`. */

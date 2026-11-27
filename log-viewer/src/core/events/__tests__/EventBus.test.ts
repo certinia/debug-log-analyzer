@@ -9,14 +9,14 @@ describe('eventBus.onSource', () => {
   it('hands each event to the tab that names it, and to no other', () => {
     const seen: string[] = [];
     const offTimeline = eventBus.onSource('inspector:reveal', 'timeline', (detail) => {
-      seen.push(`timeline ${detail.eventIndex}`);
+      seen.push(`timeline ${detail.eventId}`);
     });
     const offCalltree = eventBus.onSource('inspector:reveal', 'calltree', (detail) => {
-      seen.push(`calltree ${detail.eventIndex}`);
+      seen.push(`calltree ${detail.eventId}`);
     });
 
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 4 });
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 5 });
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventId: 4 });
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: 5 });
 
     offTimeline();
     offCalltree();

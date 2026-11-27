@@ -11,6 +11,8 @@ import {
   getColumnOverrides,
   getColumnViews,
   getConfig,
+  getInspectorState,
+  PRIVATE_SECTIONS,
   sameConfig,
   updateColumnOverride,
   type Config,
@@ -73,6 +75,44 @@ describe('getConfig', () => {
   });
 });
 
+describe('getConfig ui', () => {
+  afterEach(() => {
+    jest.mocked(workspace.getConfiguration).mockReset();
+  });
+
+  /** `registered` is false on a VS Code older than Modern UI, which has no such setting. */
+  function mockWorkbench(registered: boolean, values: Record<string, boolean> = {}): void {
+    const lana = { timeline: {}, callTree: {}, inspector: {}, inspect: jest.fn(() => undefined) };
+    const workbench = {
+      get: jest.fn((key: string, fallback?: unknown) => values[key] ?? fallback),
+      inspect: jest.fn(() => (registered ? { key: 'modernUI', defaultValue: true } : undefined)),
+    };
+    jest
+      .mocked(workspace.getConfiguration)
+      .mockImplementation(
+        (section?: string) =>
+          (section === 'workbench' ? workbench : lana) as unknown as ReturnType<
+            typeof workspace.getConfiguration
+          >,
+      );
+  }
+
+  it('reads classic from a VS Code too old to have Modern UI, as that is all it shows', () => {
+    mockWorkbench(false);
+
+    expect(getConfig().ui).toEqual({ mode: 'classic' });
+  });
+
+  it.each([
+    ['modern by default', {}, 'modern'],
+    ['classic once the user turns Modern UI off', { 'experimental.modernUI': false }, 'classic'],
+  ])('follows the Modern UI setting: %s', (_label, values, mode) => {
+    mockWorkbench(true, values);
+
+    expect(getConfig().ui.mode).toBe(mode);
+  });
+});
+
 describe('sameConfig', () => {
   const base = (): Config =>
     ({
@@ -92,6 +132,20 @@ describe('sameConfig', () => {
     changed.callTree.columnOverrides[key] = value;
 
     expect(sameConfig(base(), changed)).toBe(false);
+  });
+});
+
+describe('inspector size', () => {
+  it('is private state, so a drag never writes to settings.json or syncs to another machine', () => {
+    expect(PRIVATE_SECTIONS).toContain('inspector.sideSize');
+  });
+
+  it('reads the dragged size from globalState, and null before any drag', () => {
+    const stored = mockMemento({ 'inspector.sideSize': 900, 'inspector.bottomSize': 300 });
+    expect(getInspectorState(stored)).toMatchObject({ sideSize: 900, bottomSize: 300 });
+    // A stored pixel default would keep a later default from reaching this user.
+    expect(getInspectorState(mockMemento()).sideSize).toBeNull();
+    expect(getInspectorState(mockMemento()).bottomSize).toBeNull();
   });
 });
 

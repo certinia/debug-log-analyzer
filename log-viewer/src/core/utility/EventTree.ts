@@ -1,31 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
-/**
- * Every event at or below `roots`, depth first. A generator, so the caller's
- * own per-event work — a frame budget check, an early return — stays in its
- * loop body; the tree's size is unbounded, so nothing here recurses.
- */
-export function* walkEvents(roots: Iterable<LogEvent>): Generator<LogEvent> {
-  const stack = [...roots];
-  while (stack.length) {
-    const event = stack.pop()!; // non-empty: the loop condition just checked
-    yield event;
-    for (const child of event.children) {
-      stack.push(child);
-    }
-  }
-}
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 /**
- * The events with no ancestor in the same set, duplicates dropped. Whatever is
+ * The ids with no ancestor among them, ascending, duplicates dropped. Whatever is
  * summed or walked from these, nothing inside a kept subtree is counted twice.
  */
-export function outermostEvents(events: Iterable<LogEvent>): LogEvent[] {
-  const steps = outermostEventsSteps(events);
+export function outermostIds(log: ApexLog, ids: Iterable<number>): number[] {
+  const steps = outermostIdsSteps(log, ids);
   let step = steps.next();
   while (!step.done) {
     step = steps.next();
@@ -33,40 +16,52 @@ export function outermostEvents(events: Iterable<LogEvent>): LogEvent[] {
   return step.value;
 }
 
-/** {@link outermostEvents}, yielding after each event so a caller can run it in slices. */
-export function* outermostEventsSteps(
-  events: Iterable<LogEvent>,
-): Generator<void, LogEvent[], void> {
-  const all = new Set<LogEvent>();
-  for (const event of events) {
-    all.add(event);
+/** Ids at least this dense in their span are marked and scanned, not sorted. */
+const DENSE_SPAN = 8;
+
+/**
+ * {@link outermostIds}, yielding after each id so a caller can run it in slices.
+ * Ids are in pre-order, so an id inside the last kept one's subtree is enclosed.
+ */
+export function* outermostIdsSteps(
+  log: ApexLog,
+  ids: Iterable<number>,
+): Generator<void, number[], void> {
+  const held: number[] = [];
+  let first = Infinity;
+  let last = -1;
+  let ascending = true;
+  for (const id of ids) {
+    ascending &&= id >= last;
+    held.push(id);
+    first = Math.min(first, id);
+    last = Math.max(last, id);
     yield;
   }
-  const enclosed = new Map<LogEvent, boolean>();
-  const isEnclosed = (event: LogEvent): boolean => {
-    const passed: LogEvent[] = [];
-    let answer = false;
-    for (let parent = event.parent; parent; parent = parent.parent) {
-      if (all.has(parent)) {
-        answer = true;
-        break;
-      }
-      const known = enclosed.get(parent);
-      if (known !== undefined) {
-        answer = known;
-        break;
-      }
-      passed.push(parent);
+  const { subtreeEnd } = log.columns;
+  const outermost: number[] = [];
+  // Each row's ids ascend, but a list of rows in sort order does not.
+  if (!ascending && held.length * DENSE_SPAN >= last - first) {
+    // Sorting 270k ids in one step took 54 ms; a mark per id in the span needs no sort.
+    const marked = new Uint8Array(last - first + 1);
+    for (const id of held) {
+      marked[id - first] = 1;
     }
-    for (const node of passed) {
-      enclosed.set(node, answer);
+    for (let id = first; id <= last; yield) {
+      if (marked[id - first]) {
+        outermost.push(id);
+        id = subtreeEnd[id] ?? id + 1;
+      } else {
+        id++;
+      }
     }
-    return answer;
-  };
-  const outermost: LogEvent[] = [];
-  for (const event of all) {
-    if (!isEnclosed(event)) {
-      outermost.push(event);
+    return outermost;
+  }
+  let end = 0;
+  for (const id of ascending ? held : Int32Array.from(held).sort()) {
+    if (id >= end) {
+      outermost.push(id);
+      end = subtreeEnd[id] ?? id + 1;
     }
     yield;
   }

@@ -3,7 +3,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 
 /**
  * Five of Wong's colour-blind-safe eight. A data palette, so these stay literal
@@ -278,7 +278,7 @@ const palettes = new WeakMap<ApexLog, (namespace: string) => string>();
 export function logNamespacePalette(log: ApexLog): (namespace: string) => string {
   let palette = palettes.get(log);
   if (!palette) {
-    palette = namespacePalette([DEFAULT_NAMESPACE, ...log.namespaces]);
+    palette = namespacePalette(log.namespaces);
     palettes.set(log, palette);
   }
   return palette;

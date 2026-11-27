@@ -4,12 +4,12 @@
 import { html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
-import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { countColumn, textColumn } from '../../../components/grid/columns.js';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { currentLogStore } from '#core/log/LogStore.js';
+import type { SoqlEvent } from '#core/log/statements.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOQL_VIEWS } from '../../../components/grid/ColumnViews.js';
-import { NAMESPACE_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import {
   rowCountColumn,
@@ -18,9 +18,6 @@ import {
   timeTakenColumn,
   type StatementRow,
 } from './StatementGrid.js';
-
-// Both cardinality columns: the title wrapped to two lines is the constraint.
-const CARDINALITY_WIDTH = 113;
 
 interface SOQLRow extends StatementRow {
   soql: string;
@@ -35,22 +32,29 @@ interface SOQLRow extends StatementRow {
   fields: string | null;
 }
 
+function noPlanNote(): string {
+  const why = describeLevelGap(currentLogStore()?.levelGap('queryPlans'));
+  return why
+    ? `Selectivity could not be determined. ${why}`
+    : 'Selectivity could not be determined.';
+}
+
 function selectiveColumn(): GridColumn<SOQLRow> {
   return {
     id: 'isSelective',
     title: 'Selective',
-    width: 99,
+    width: 'content',
     cell: ({ isSelective }) =>
       isSelective === null ? '' : html`<span class="${isSelective ? 'tick' : 'cross'}"></span>`,
     exportText: (row) => String(row.relativeCost ?? ''),
     tooltip: ({ isSelective, relativeCost }) => {
       const title =
         isSelective === null
-          ? 'Selectivity could not be determined.'
+          ? noPlanNote()
           : isSelective
             ? 'Query is selective.'
             : 'Query is not selective.';
-      return relativeCost ? `${title}\nRelative cost: ${relativeCost}` : title;
+      return relativeCost === null ? title : `${title}\nRelative cost: ${relativeCost}`;
     },
     // A query with no plan sorts last either way.
     sort: { value: (row) => (row.isSelective === null ? null : (row.relativeCost ?? 0)) },
@@ -72,7 +76,6 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'objectType',
       title: 'Object',
       value: (row) => row.objectType,
-      width: 110,
       hidden: true,
       hoverText: true,
       empty: '—',
@@ -81,13 +84,11 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'namespace',
       title: 'Namespace',
       value: (row) => row.namespace,
-      width: NAMESPACE_WIDTH,
     }),
     textColumn({
       id: 'callerNamespace',
       title: 'Caller Namespace',
       value: (row) => row.callerNamespace,
-      width: NAMESPACE_WIDTH,
       hidden: true,
     }),
     rowCountColumn(rows),
@@ -95,13 +96,11 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'aggregations',
       title: 'Aggregations',
       value: (row) => row.aggregations,
-      width: 121,
     }),
     countColumn({
       id: 'relativeCost',
       title: 'Relative Cost',
       value: (row) => row.relativeCost,
-      width: 92,
       hidden: true,
       summed: false,
     }),
@@ -109,7 +108,6 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'leadingOperationType',
       title: 'Leading Operation',
       value: (row) => row.leadingOperationType,
-      width: 140,
       hidden: true,
       hoverText: true,
     }),
@@ -117,7 +115,6 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'sObjectType',
       title: 'SObject Type',
       value: (row) => row.sObjectType,
-      width: 130,
       hidden: true,
       hoverText: true,
     }),
@@ -125,7 +122,6 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'cardinality',
       title: 'Cardinality',
       value: (row) => row.cardinality,
-      width: CARDINALITY_WIDTH,
       hidden: true,
       summed: false,
     }),
@@ -133,7 +129,6 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'sObjectCardinality',
       title: 'SObject Cardinality',
       value: (row) => row.sObjectCardinality,
-      width: CARDINALITY_WIDTH,
       hidden: true,
       summed: false,
     }),
@@ -141,7 +136,6 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
       id: 'fields',
       title: 'Indexed Fields',
       value: (row) => row.fields,
-      width: 140,
       hidden: true,
       hoverText: true,
     }),
@@ -151,7 +145,7 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
 }
 
 @customElement('soql-view')
-export class SOQLView extends StatementGrid<SOQLRow, SOQLExecuteBeginLine> {
+export class SOQLView extends StatementGrid<SOQLRow, SoqlEvent> {
   constructor() {
     super({
       type: 'soql',
@@ -172,19 +166,20 @@ export class SOQLView extends StatementGrid<SOQLRow, SOQLExecuteBeginLine> {
     });
   }
 
-  protected toRows(lines: readonly SOQLExecuteBeginLine[]): SOQLRow[] {
+  protected toRows(lines: readonly SoqlEvent[], callerOf: (id: number) => string): SOQLRow[] {
     return lines.map((soql) => {
-      const plan = soql.children[0];
+      const { explain: plan, aggregations } = soql.details;
+      const relativeCost = plan?.relativeCost ?? null;
       return {
-        eventIndex: soql.eventIndex,
-        soql: soql.text,
-        isSelective: plan?.relativeCost ? plan.relativeCost <= 1 : null,
-        relativeCost: plan?.relativeCost ?? null,
+        eventId: soql.id,
+        soql: soql.text ?? '',
+        isSelective: relativeCost === null ? null : relativeCost <= 1,
+        relativeCost,
         namespace: soql.namespace,
-        callerNamespace: getCallerNamespace(soql),
-        rowCount: soql.soqlRowCount.self,
+        callerNamespace: callerOf(soql.id),
+        rowCount: soql.soqlRowCount?.self ?? 0,
         timeTaken: soql.duration.total,
-        aggregations: soql.aggregations,
+        aggregations: aggregations ?? 0,
         objectType: deriveSoqlObject(soql),
         leadingOperationType: plan?.leadingOperationType ?? null,
         sObjectType: plan?.sObjectType ?? null,

@@ -79,6 +79,21 @@ describe('ResizeController', () => {
     expect(calls).toBe(1);
   });
 
+  it('watches an extra element now and again after a re-attach', () => {
+    stubResizeObserver();
+    const host = fakeHost(document.createElement('div'));
+    const box = document.createElement('div');
+    const controller = new ResizeController(host, () => {});
+
+    host.connect();
+    controller.observe(box);
+    host.disconnect();
+    host.connect();
+
+    // A box watched only once would stop reporting after the panel is re-attached.
+    expect(built[0]?.observed.filter((el) => el === box)).toHaveLength(2);
+  });
+
   it('re-observes with the same observer after a re-attach', () => {
     stubResizeObserver();
     const host = fakeHost(document.createElement('div'));

@@ -6,7 +6,7 @@
  * EventMatcher
  *
  * Generic event searcher for timeline events.
- * Decoupled from LogEvent-specific implementation, works with any EventNode type.
+ * Decoupled from ApexEvent-specific implementation, works with any EventNode type.
  *
  * Responsibilities:
  * - Scan the shown frames in pre-order
@@ -15,18 +15,14 @@
  * - Track current search state
  */
 
-import type { PrecomputedRect } from '../RectangleCache.js';
-import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  SearchCursor,
-  SearchMatch,
-  SearchOptions,
-} from '../../types/search.types.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '#core/utility/FrameBudget.js';
+import { type EventNode, rectCategory, type TimelineFrames } from '../../types/flamechart.types.js';
+import type { FramePredicate, SearchCursor, SearchMatch } from '../../types/search.types.js';
 import { SearchCursorImpl } from './SearchCursor.js';
 
 export class EventMatcher<E extends EventNode> {
   private currentCursor?: SearchCursorImpl<E>;
+  private running?: AbortController;
   private frames: TimelineFrames<E>;
 
   constructor(frames: TimelineFrames<E>) {
@@ -34,14 +30,21 @@ export class EventMatcher<E extends EventNode> {
   }
 
   /**
-   * Search events using predicate function.
+   * Search events using predicate function, a slice at a time. A newer search or a clear
+   * stops it, and it then gives null.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
-   * @returns SearchCursor for navigating results
+   * @returns The cursor, or null when a newer search or a clear stopped it
    */
-  search(predicate: FramePredicate, _options: SearchOptions = {}): SearchCursor<E> {
-    const matches = this.scan(predicate);
+  async search(predicate: FramePredicate): Promise<SearchCursor<E> | null> {
+    this.running?.abort();
+    const running = new AbortController();
+    this.running = running;
+    const matches = await this.scan(predicate, frameBudget({ signal: running.signal }));
+    if (!matches || running.signal.aborted) {
+      return null;
+    }
+    this.running = undefined;
     this.currentCursor = new SearchCursorImpl(matches);
     return this.currentCursor;
   }
@@ -50,15 +53,9 @@ export class EventMatcher<E extends EventNode> {
    * Clear current search and reset cursor.
    */
   clear(): void {
+    this.running?.abort();
+    this.running = undefined;
     this.currentCursor = undefined;
-  }
-
-  /**
-   * Set the current cursor. Used to restore cursor after it was cleared.
-   * @param cursor - The cursor to restore
-   */
-  setCursor(cursor: SearchCursorImpl<E>): void {
-    this.currentCursor = cursor;
   }
 
   /**
@@ -74,17 +71,20 @@ export class EventMatcher<E extends EventNode> {
    * Collect the shown frames that match and have a rect, in pre-order: the order
    * the frames appear in the log.
    */
-  private scan(predicate: FramePredicate): SearchMatch<E>[] {
+  private async scan(predicate: FramePredicate, tick: Tick): Promise<SearchMatch<E>[] | null> {
     const frames = this.frames;
     const matches: SearchMatch<E>[] = [];
+    let checked = 0;
     for (let row = 0; row < frames.rowCount;) {
+      if (++checked % CHECK_EVERY === 0 && !(await tick())) {
+        return null;
+      }
       if (!frames.isVisible(row)) {
         row = frames.subtreeEnd[row]!;
         continue;
       }
-      const rect = frames.rectOf(row);
-      if (rect && predicate(frames.text(row), frames.type(row))) {
-        matches.push(new RowMatch(frames, row, rect));
+      if (frames.hasRect(row) && predicate(frames.text(row), frames.type(row))) {
+        matches.push(new RowMatch(frames, row));
       }
       row++;
     }
@@ -108,19 +108,29 @@ export function textPredicate(searchText: string, caseSensitive = false): FrameP
 
 // Builds its event only when asked: a search can match a hundred thousand frames.
 class RowMatch<E extends EventNode> implements SearchMatch<E> {
-  readonly rect: PrecomputedRect;
   private readonly frames: TimelineFrames<E>;
-  private readonly row: number;
+  readonly row: number;
   private built?: E;
 
-  constructor(frames: TimelineFrames<E>, row: number, rect: PrecomputedRect) {
+  constructor(frames: TimelineFrames<E>, row: number) {
     this.frames = frames;
     this.row = row;
-    this.rect = rect;
+  }
+
+  get timeStart(): number {
+    return this.frames.start[this.row]!;
+  }
+
+  get duration(): number {
+    return this.frames.total[this.row]!;
+  }
+
+  get category(): string {
+    return rectCategory(this.frames, this.row);
   }
 
   get depth(): number {
-    return this.rect.depth;
+    return this.frames.depth[this.row]!;
   }
 
   get matchType(): 'text' {

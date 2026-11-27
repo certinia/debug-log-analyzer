@@ -24,7 +24,7 @@ import { type ApexLog, parse } from '@apexdevtools/apex-log-parser';
 
 import { measureCallTree } from './call-tree.js';
 import { measureGrid } from './grid.js';
-import { die, time } from './harness.js';
+import { die, print, time } from './harness.js';
 import { digestMinimap, measureMinimap } from './minimap.js';
 import { digestTimeline, measureTimeline } from './timeline.js';
 import { measureVariables } from './variables.js';
@@ -85,16 +85,21 @@ if (digest && names.length > 1) {
   die(`name one area to digest: ${names.join(', ')}\n${USAGE}`);
 }
 
-let text: string;
+// Bytes, as the webview fetches them: the parser reads them without a decoded copy.
+let bytes: Uint8Array;
 try {
-  text = readFileSync(logPath, 'utf8');
+  bytes = readFileSync(logPath);
 } catch (error) {
   die(`${(error as Error).message}\n${USAGE}`);
 }
 if (!digest) {
-  console.log(`log ${Math.round(text.length / 1048576)}MB, ${text.split('\n').length} lines\n`);
+  let lines = 1;
+  for (const byte of bytes) {
+    lines += byte === 10 ? 1 : 0;
+  }
+  print(`log ${Math.round(bytes.length / 1048576)}MB, ${lines} lines\n`);
 }
-const log = digest ? parse(text) : await time('parse', () => parse(text));
+const log = digest ? await parse(bytes) : await time('parse', () => parse(bytes));
 
 for (const name of names) {
   const area = AREAS[name]!;
@@ -102,6 +107,6 @@ for (const name of names) {
     await area.digest(log);
     continue;
   }
-  console.log(`\n--- ${name} ---`);
+  print(`\n--- ${name} ---`);
   await area.run(log);
 }

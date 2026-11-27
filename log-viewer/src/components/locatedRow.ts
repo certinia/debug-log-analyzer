@@ -2,12 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-
-import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
-import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
-import { logStoreFor } from '../core/log/LogStore.js';
-import { eventByEventIndex } from '../core/utility/EventSearch.js';
+import type { DetailSelection, SelectionView } from '#core/events/EventBus.js';
+import { ROOT_PATH_ID } from '#core/log/keyPathIds.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 /** How the inspector reads a grid's row: its data, and the row above it. */
 export interface RowReader<R> {
@@ -16,23 +13,25 @@ export interface RowReader<R> {
 }
 
 /** What the inspector reads off a row. A merged row's `key` is the bucket it stands for,
- *  `instances` the occurrences it holds, which a bottom-up caller bucket has none of. */
+ *  `eventIds` the occurrences it holds, which a bottom-up caller bucket has none of. */
 export interface RowData {
   key?: string;
   /** The interned bucket path the row's builder stamped on it. */
   _pathId?: number;
   text?: string;
-  instances?: LogEvent[];
-  originalData?: LogEvent;
+  /** The ids of the calls the row merges. */
+  eventIds?: readonly number[];
+  /** The id of the row's event, or of a merged row's first call. */
+  eventId?: number;
 }
 
 const rowCallData = <R>(row: R, read: RowReader<R>): RowData => read.data(row);
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
-const derivedIndexes = new WeakMap<RowData, number[]>();
+const derivedIds = new WeakMap<RowData, readonly number[]>();
 
-const NO_CALLS: LogEvent[] = [];
+const NO_EVENT_IDS: readonly number[] = [];
 
 /**
  * The root bucket a derived row reads its calls from, or null where the walk
@@ -56,25 +55,29 @@ function rootBucketOf<R>(row: R, read: RowReader<R>, data: RowData): RowData | n
  * The calls a row stands for. A bottom-up caller row holds none of its own, so it
  * is derived from its root bucket and the chain that reaches it.
  */
-function rowCallOccurrences<R>(row: R, read: RowReader<R>, root: ApexLog | null): LogEvent[] {
+function rowCallOccurrences<R>(
+  row: R,
+  read: RowReader<R>,
+  store: LogStore | null,
+): readonly number[] {
   const data = rowCallData(row, read);
-  if (data.instances?.length) {
-    return data.instances;
+  if (data.eventIds?.length) {
+    return data.eventIds;
   }
   if (data.key === undefined) {
-    return data.originalData ? [data.originalData] : NO_CALLS;
+    return data.eventId === undefined ? NO_EVENT_IDS : [data.eventId];
   }
-  return derivedRowOf(row, read, data, root).calls;
+  return derivedRowOf(row, read, data, store).eventIds;
 }
 
 /** What a derived row's bucket answers: the calls whose chain runs through the
  *  row, and the frames the row is at its own depth. */
 interface DerivedRow {
-  calls: LogEvent[];
-  frames: number[];
+  eventIds: readonly number[];
+  frameIds: number[];
 }
 
-const NOTHING_DERIVED: DerivedRow = { calls: NO_CALLS, frames: [] };
+const NOTHING_DERIVED: DerivedRow = { eventIds: NO_EVENT_IDS, frameIds: [] };
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
@@ -87,39 +90,39 @@ const derivedRows = new WeakMap<RowData, DerivedRow>();
  * One walk per occurrence answers both: the walk that decides whether a chain
  * reaches the row stands on the row's own frame when it does.
  *
- * The table is the log's that built the rows: a path id is minted per log, so
- * another log's table would answer about a path of its own.
+ * The table is the store's that built the rows: a path id is minted per store, so
+ * another store's table would answer about a path of its own.
  */
 function derivedRowOf<R>(
   row: R,
   read: RowReader<R>,
   data: RowData,
-  root: ApexLog | null,
+  store: LogStore | null,
 ): DerivedRow {
   const cached = derivedRows.get(data);
   if (cached) {
     return cached;
   }
   const pathId = data._pathId;
-  if (pathId === undefined || !root) {
+  if (pathId === undefined || !store) {
     return NOTHING_DERIVED;
   }
-  const paths = logStoreFor(root).keyPathIds();
-  const instances = rootBucketOf(row, read, data)?.instances;
-  if (!instances?.length) {
+  const paths = store.keyPathIds();
+  const bucketIds = rootBucketOf(row, read, data)?.eventIds;
+  if (!bucketIds?.length) {
     return NOTHING_DERIVED;
   }
-  const calls: LogEvent[] = [];
+  const eventIds: number[] = [];
   const own = new Set<number>();
-  for (const event of instances) {
-    const node = paths.chainNodeAt(event, pathId);
+  for (const id of bucketIds) {
+    const node = paths.chainNodeAt(id, pathId);
     if (node) {
-      calls.push(event);
-      own.add(node.eventIndex);
+      eventIds.push(id);
+      own.add(node);
     }
   }
-  const derived = { calls, frames: [...own] };
-  if (calls.length) {
+  const derived = { eventIds, frameIds: [...own] };
+  if (eventIds.length) {
     // Not kept where nothing derived, for the reason `rowOccurrences` gives.
     derivedRows.set(data, derived);
   }
@@ -127,7 +130,7 @@ function derivedRowOf<R>(
 }
 
 /**
- * The path ids that the frames `eventIndexes` name stand for, so a grid whose
+ * The path ids that the frames `eventIds` name stand for, so a grid whose
  * rows merge occurrences can mark them.
  *
  * A bottom-up row is the frame at its own depth, so a frame stands for the rows
@@ -135,24 +138,18 @@ function derivedRowOf<R>(
  * rows. A top-down row sits on the frame's own chain, so one id names it.
  */
 function pathIdsForEvents(
-  root: ApexLog,
-  eventIndexes: readonly number[],
+  store: LogStore,
+  eventIds: readonly number[],
   direction: SelectionView,
 ): number[] {
-  const paths = logStoreFor(root).keyPathIds();
-  const events: LogEvent[] = [];
-  for (const eventIndex of eventIndexes) {
-    const event = eventByEventIndex(root, eventIndex);
-    if (event) {
-      events.push(event);
-    }
-  }
+  const paths = store.keyPathIds();
+  const ids = eventIds.filter((id) => store.isShown(id));
   if (direction === 'callers') {
-    return paths.pathsEndingIn(new Set(events.map((event) => paths.keyIdOf(event))));
+    return paths.pathsEndingIn(new Set(ids.map((id) => paths.keyIdOf(id))));
   }
   const found = new Set<number>();
-  for (const event of events) {
-    const pathId = paths.pathIdOf(event);
+  for (const id of ids) {
+    const pathId = paths.pathIdOf(id);
     if (pathId !== undefined) {
       found.add(pathId);
     }
@@ -160,22 +157,22 @@ function pathIdsForEvents(
   return [...found];
 }
 
-/** The calls a row stands for, as the event indexes the mark works in.
+/** The calls a row stands for, as the event ids the mark works in.
  *
- * @param root - the log the row was built from, which its path id belongs to */
-function rowOccurrences<R>(row: R, read: RowReader<R>, root: ApexLog | null): number[] {
+ * @param store - the store the row was built from, which its path id belongs to */
+function rowOccurrences<R>(row: R, read: RowReader<R>, store: LogStore | null): readonly number[] {
   const data = rowCallData(row, read);
-  const cached = derivedIndexes.get(data);
+  const cached = derivedIds.get(data);
   if (cached) {
     return cached;
   }
-  const indexes = rowCallOccurrences(row, read, root).map((event) => event.eventIndex);
-  if (indexes.length) {
+  const ids = rowCallOccurrences(row, read, store);
+  if (ids.length) {
     // Not kept where nothing derived: the calls are read through the log on
     // screen, so an answer of none can be that log not being set yet.
-    derivedIndexes.set(data, indexes);
+    derivedIds.set(data, ids);
   }
-  return indexes;
+  return ids;
 }
 
 /**
@@ -194,44 +191,44 @@ function rowOccurrences<R>(row: R, read: RowReader<R>, root: ApexLog | null): nu
 export function rowFrames<R>(
   row: R,
   read: RowReader<R>,
-  root: ApexLog | null,
+  store: LogStore | null,
   direction: SelectionView,
-): number[] {
+): readonly number[] {
   const data = rowCallData(row, read);
   const pathId = data._pathId;
-  if (direction !== 'callers' || !root || pathId === undefined) {
-    return rowOccurrences(row, read, root);
+  if (direction !== 'callers' || !store || pathId === undefined) {
+    return rowOccurrences(row, read, store);
   }
-  if (logStoreFor(root).keyPathIds().parentOf(pathId) === ROOT_PATH_ID) {
+  if (store.keyPathIds().parentOf(pathId) === ROOT_PATH_ID) {
     // A row at the depth of its own calls stands for them.
-    return rowOccurrences(row, read, root);
+    return rowOccurrences(row, read, store);
   }
-  return derivedRowOf(row, read, data, root).frames;
+  return derivedRowOf(row, read, data, store).frameIds;
 }
 
 /**
  * What a selected row tells the inspector: a merged row names every call it
  * counts, a Time Order row the one call it is, and no row nothing.
  *
- * @param root - the log the row was built from, which its path id belongs to
+ * @param store - the store the row was built from, which its path id belongs to
  * @param direction - the way the row's own table reads the tree
  */
 export function rowDetailSelection<R>(
   row: R | null,
   read: RowReader<R>,
-  root: ApexLog | null,
+  store: LogStore | null,
   direction: SelectionView,
 ): DetailSelection | null {
   if (!row) {
     return null;
   }
   const data = rowCallData(row, read);
-  const event = data.originalData;
-  if (!event) {
+  const { eventId } = data;
+  if (eventId === undefined) {
     return null;
   }
   if (data.key === undefined) {
-    return { kind: 'event', eventIndex: event.eventIndex };
+    return { kind: 'event', eventId };
   }
   // The row itself is what reached the calls, at whatever depth it sits: a
   // deeper row narrows the same calls to the ones its own chain conducted, so
@@ -239,9 +236,9 @@ export function rowDetailSelection<R>(
   // its own calls, so nothing reached them but it.
   return {
     kind: 'aggregate',
-    instances: rowOccurrences(row, read, root),
-    frames: rowFrames(row, read, root, direction),
-    calledBy: data.instances?.length ? undefined : data.text,
+    eventIds: [...rowOccurrences(row, read, store)],
+    frameIds: [...rowFrames(row, read, store, direction)],
+    calledBy: data.eventIds?.length ? undefined : data.text,
   };
 }
 
@@ -253,50 +250,50 @@ export function rowDetailSelection<R>(
  * it feeds.
  */
 export class LocatedRowIds {
-  private lastRoot: ApexLog | null = null;
+  private lastStore: LogStore | null = null;
   private lastEvents: readonly number[] | undefined;
   private lastDirection: SelectionView | undefined;
   private lastIds: readonly number[] = [];
 
   /**
    * @param direction - The view's own direction, or undefined where its rows are
-   * keyed by event and so are named by the indexes themselves.
+   * keyed by event and so are named by the event ids themselves.
    */
   public idsFor(
-    root: ApexLog,
-    eventIndexes: readonly number[],
+    store: LogStore,
+    eventIds: readonly number[],
     direction: SelectionView,
   ): readonly number[];
   public idsFor(
-    root: ApexLog | null,
-    eventIndexes: readonly number[],
+    store: LogStore | null,
+    eventIds: readonly number[],
     direction: SelectionView | undefined,
   ): readonly number[];
   public idsFor(
-    root: ApexLog | null,
-    eventIndexes: readonly number[],
+    store: LogStore | null,
+    eventIds: readonly number[],
     direction: SelectionView | undefined,
   ): readonly number[] {
     if (!direction) {
-      // The view's rows are keyed by event, so the indexes name them as they are.
-      return eventIndexes;
+      // The view's rows are keyed by event, so the event ids name them as they are.
+      return eventIds;
     }
-    if (!root || !eventIndexes.length) {
-      // A path id and an event index are both small integers, so passing the
-      // indexes on would mark whichever rows happened to share their numbers.
+    if (!store || !eventIds.length) {
+      // A path id and an event id are both small integers, so passing the
+      // event ids on would mark whichever rows happened to share their numbers.
       return [];
     }
     if (
-      this.lastEvents === eventIndexes &&
+      this.lastEvents === eventIds &&
       this.lastDirection === direction &&
-      this.lastRoot === root
+      this.lastStore === store
     ) {
       return this.lastIds;
     }
-    this.lastRoot = root;
-    this.lastEvents = eventIndexes;
+    this.lastStore = store;
+    this.lastEvents = eventIds;
     this.lastDirection = direction;
-    this.lastIds = pathIdsForEvents(root, eventIndexes, direction);
+    this.lastIds = pathIdsForEvents(store, eventIds, direction);
     return this.lastIds;
   }
 }

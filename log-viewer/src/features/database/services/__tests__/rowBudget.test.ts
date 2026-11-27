@@ -35,8 +35,8 @@ import { rowBudgets } from '../rowBudget.js';
 const budgetsOf = (snapshots: number) => stubStore(logWith(snapshots)).derive(rowBudgets);
 
 const statement = (fields: Partial<DatabaseStatement>): DatabaseStatement => ({
-  eventIndex: 1,
-  eventIndexes: [1],
+  eventId: 1,
+  eventIds: [1],
   kind: 'SOQL',
   label: 'SELECT Id FROM Account',
   sObject: 'Account',
@@ -55,7 +55,6 @@ const overviewOf = (
 ): DatabaseOverview => ({
   time: {
     timeNs: 0,
-    logNs: 1_000_000_000,
     percentOfLog: 0,
     soql: { timeNs: 0, statements: counts.soql },
     dml: { timeNs: 0, statements: counts.dml },
@@ -68,7 +67,7 @@ const overviewOf = (
 });
 
 const logWith = (snapshots: number) =>
-  ({ governorLimits: { snapshots: Array.from({ length: snapshots }) } }) as unknown as ApexLog;
+  ({ limits: { snapshots: Array.from({ length: snapshots }) } }) as unknown as ApexLog;
 
 const defaultPeaks = (): Limits => ({
   ...emptyLimits(),

@@ -2,16 +2,30 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent, GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser';
-import { ROOT_PATH_ID, type KeyPathIds } from '../../../core/log/keyPathIds.js';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import {
-  CHECK_EVERY,
-  frameBudget,
-  type FrameBudgetOptions,
-} from '../../../core/utility/FrameBudget.js';
-import { computeHasDetailsDeep } from './DetailsFilter.js';
+import type { LogCategory } from '#core/log/category.js';
+import { ROOT_PATH_ID, type KeyPathIds } from '#core/log/keyPathIds.js';
+import { rowCategory, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { rowMetrics, type RowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
+import { type Signatures, signaturesOf } from '#core/log/signatures.js';
+import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
+import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '#core/utility/FrameBudget.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
+import {
+  addReported,
+  emptyReported,
+  REPORTED_METRICS,
+  type ReportedCounts,
+  type ReportedUsage,
+  type TimeSpan,
+  WHOLE_LOG,
+} from './reportedUsage.js';
+
+/** A metric's own part and total, summed over a row's calls. */
+export interface Tally {
+  self: number;
+  total: number;
+}
 
 /**
  * Represents a row in the aggregated call tree view.
@@ -41,37 +55,43 @@ export interface AggregatedRow {
   /** Average self-time per call */
   avgSelfTime: number;
   /** Total DML count */
-  dmlCount: SelfTotal;
+  dmlCount: Tally;
   /** Total SOQL count */
-  soqlCount: SelfTotal;
+  soqlCount: Tally;
   /** Total SOSL count */
-  soslCount: SelfTotal;
+  soslCount: Tally;
   /** Total DML rows */
-  dmlRowCount: SelfTotal;
+  dmlRowCount: Tally;
   /** Total SOQL rows */
-  soqlRowCount: SelfTotal;
+  soqlRowCount: Tally;
   /** Total SOSL rows */
-  soslRowCount: SelfTotal;
+  soslRowCount: Tally;
   /** Total + self exceptions thrown */
-  thrownCount: SelfTotal;
+  thrownCount: Tally;
   /** Total + self signed NET heap bytes (alloc − free; may be negative) — retention */
-  heapAllocated: SelfTotal;
+  heapAllocated: Tally;
   /** Total + self GROSS heap bytes allocated (frees ignored) — churn */
-  heapGross: SelfTotal;
+  heapGross: Tally;
   /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
   heapPeak: number;
   /** Average governor consumption across all reported governors (0–100%); null if none. */
   governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
   governorCostMax: number | null;
+  /** What these calls used of each limit, counted as the Seen totals are. */
+  reported: ReportedCounts;
+  /** The row this one sits under; null at the top level */
+  _parent?: AggregatedRow | null;
+  /** The next row of this build with the same key, when the build was asked for {@link KeyRows} */
+  _nextOfKey?: AggregatedRow | null;
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
-  /** References to original events for drill-down */
-  instances: LogEvent[];
-  /** Representative event for this row (used by formatters) */
-  originalData: LogEvent;
-  /** See {@link TimeOrderRow._hasDetailsDeep}. Precomputed during tree build. */
-  _hasDetailsDeep: boolean;
+  /** The event ids of the calls this row merges, for drill-down */
+  eventIds: number[];
+  /** The event id of this row's first call (used by formatters) */
+  eventId: number;
+  /** The timeline category of this row's calls */
+  category: LogCategory;
 }
 
 /**
@@ -105,67 +125,79 @@ export interface BottomUpRow {
   /** Average self-time per call */
   avgSelfTime: number;
   /** Total DML count */
-  dmlCount: SelfTotal;
+  dmlCount: Tally;
   /** Total SOQL count */
-  soqlCount: SelfTotal;
+  soqlCount: Tally;
   /** Total SOSL count */
-  soslCount: SelfTotal;
+  soslCount: Tally;
   /** Total DML rows */
-  dmlRowCount: SelfTotal;
+  dmlRowCount: Tally;
   /** Total SOQL rows */
-  soqlRowCount: SelfTotal;
+  soqlRowCount: Tally;
   /** Total SOSL rows */
-  soslRowCount: SelfTotal;
+  soslRowCount: Tally;
   /** Total + self exceptions thrown */
-  thrownCount: SelfTotal;
+  thrownCount: Tally;
   /** Total + self signed NET heap bytes (alloc − free; may be negative) — retention */
-  heapAllocated: SelfTotal;
+  heapAllocated: Tally;
   /** Total + self GROSS heap bytes allocated (frees ignored) — churn */
-  heapGross: SelfTotal;
+  heapGross: Tally;
   /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
   heapPeak: number;
   /** Average governor consumption across all reported governors (0–100%); null if none. */
   governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
   governorCostMax: number | null;
+  /** What these calls used of each limit, counted as the Seen totals are. */
+  reported: ReportedCounts;
+  /** The row this one sits under; null at the top level */
+  _parent?: BottomUpRow | null;
+  /** The next row of this build with the same key, when the build was asked for {@link KeyRows} */
+  _nextOfKey?: BottomUpRow | null;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
   /**
-   * References to the displayed events for drill-down. Populated only on root
+   * The event ids of the displayed calls, for drill-down. Populated only on root
    * buckets (used by the table-level `bottomCalc`); deep buckets leave this
-   * empty — use {@link originalData} when a single representative is needed.
+   * empty — use {@link eventId} when a single representative is needed.
    */
-  instances: LogEvent[];
-  /** Representative event for this row (used by formatters) */
-  originalData: LogEvent;
-  /** See {@link TimeOrderRow._hasDetailsDeep}. Precomputed during tree build. */
-  _hasDetailsDeep: boolean;
+  eventIds: number[];
+  /** The event id of this row's first call (used by formatters) */
+  eventId: number;
+  /** The timeline category of this row's calls */
+  category: LogCategory;
 }
 
 /**
  * Creates an aggregated call tree where all calls to the same function signature
  * are merged together, with aggregated metrics. A recursive call adds no total
  * time of its own: the frame open above it already holds the time they share.
+ *
+ * @param index - the shown rows of `store`
  */
 export function toAggregatedCallTree(
-  rootChildren: LogEvent[],
-  paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
+  index: LogIndex,
+  store: LogStore,
+  reported: ReportedUsage | null = null,
 ): AggregatedRow[] {
-  return runSteps(aggregatedSteps(rootChildren, paths, governorLimits));
+  return runSteps(aggregatedSteps(buildContext(index, store, reported)));
 }
 
 /**
- * {@link toAggregatedCallTree} in slices that hand the thread back between them
- * (see {@link FrameBudgetOptions}). Returns null once `options.signal` aborts.
+ * {@link toAggregatedCallTree} of the store's shown rows, in slices that hand the
+ * thread back between them (see {@link FrameBudgetOptions}). Returns null once
+ * `options.signal` aborts.
+ *
+ * @param rowsByKey - an empty map, filled with this build's rows by key; one build's only
  */
 export async function buildAggregatedTree(
-  rootChildren: LogEvent[],
-  paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
+  store: LogStore,
   options: FrameBudgetOptions = {},
+  reported: ReportedUsage | null = null,
+  rowsByKey?: Map<number, KeyRows<AggregatedRow>>,
 ): Promise<AggregatedRow[] | null> {
-  return driveSteps(aggregatedSteps(rootChildren, paths, governorLimits), options);
+  const index = await store.logIndex();
+  return driveSteps(aggregatedSteps(buildContext(index, store, reported, rowsByKey)), options);
 }
 
 function runSteps<T>(steps: Generator<void, T, void>): T {
@@ -191,6 +223,86 @@ async function driveSteps<T>(
   return step.value;
 }
 
+/** What every row of one build reads. */
+interface BuildContext {
+  index: LogIndex;
+  metrics: RowMetrics;
+  paths: KeyPathIds;
+  signatures: Signatures;
+  costLimits: CostLimits;
+  reported: ReportedUsage | null;
+  /** Per-build monotonic counter; the grid keys rows by id, so ids are unique within this tree. */
+  idFor: () => number;
+  /** The labels of `eventId`'s signature, one object per signature. */
+  labelsOf: (eventId: number) => SignatureLabels;
+}
+
+/** What every row of one signature shows, held once and shared by those rows. */
+interface SignatureLabels {
+  readonly keyId: number;
+  readonly key: string;
+  readonly text: string;
+  readonly namespace: string;
+  readonly type: string;
+  readonly rows: KeyRows<unknown> | undefined;
+}
+
+function buildContext(
+  index: LogIndex,
+  store: LogStore,
+  reported: ReportedUsage | null,
+  rowsByKey?: Map<number, KeyRows<unknown>>,
+): BuildContext {
+  let next = 0;
+  const paths = store.keyPathIds();
+  const signatures = signaturesOf(store.log);
+  const labels = new Map<number, SignatureLabels>();
+  return {
+    index,
+    metrics: rowMetrics(index),
+    paths,
+    signatures,
+    costLimits: costLimitsOf(store.log.limits),
+    reported,
+    idFor: () => ++next,
+    labelsOf: (eventId) => {
+      const signature = signatures.of(eventId);
+      let shared = labels.get(signature);
+      if (!shared) {
+        const keyId = paths.keyIdOf(eventId);
+        let rows = rowsByKey?.get(keyId);
+        if (rowsByKey && !rows) {
+          rows = { first: null };
+          rowsByKey.set(keyId, rows);
+        }
+        shared = {
+          keyId,
+          key: paths.keyText(keyId),
+          text: signatures.text(signature),
+          namespace: signatures.namespace(signature),
+          type: signatures.type(signature),
+          rows,
+        };
+        labels.set(signature, shared);
+      }
+      return shared;
+    },
+  };
+}
+
+/** The rows of one build with one key, newest first, linked through each row's `_nextOfKey`. */
+export interface KeyRows<R> {
+  // A holder, not a map of heads: the labels share it, so a new row links in with no map lookup.
+  first: R | null;
+}
+
+/** The time of an index row, or of the whole log for {@link NO_ROW}. */
+function spanOf(index: LogIndex, row: number): TimeSpan {
+  return row === NO_ROW
+    ? WHOLE_LOG
+    : { startTimestamp: index.start[row]!, endTimestamp: index.end[row]! };
+}
+
 type AggregateFrame = {
   // null on the frame that holds the roots.
   row: AggregatedRow | null;
@@ -198,38 +310,33 @@ type AggregateFrame = {
   next: number;
 };
 
-function* aggregatedSteps(
-  rootChildren: LogEvent[],
-  paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
-): Generator<void, AggregatedRow[], void> {
-  if (rootChildren.length === 0) {
+/** The event ids a level groups the callees of; the log, which heads no row, is id 0. */
+const LOG_CALL_IDS: readonly number[] = [0];
+
+function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], void> {
+  if (ctx.index.rowCount === 0) {
     return [];
   }
-
-  // Per-build monotonic counter; row ids must be globally unique within this
-  // tree so deepFilter caches don't collide across cascaded subtree passes.
-  let next = 0;
-  const idFor = (): number => ++next;
-  const costLimits = governorLimits && costLimitsOf(governorLimits);
   let budget = CHECK_EVERY;
 
   // The grouping loop runs outside the generator: run inside it, it is about 15% slower.
   function* group(
-    calls: readonly { children: LogEvent[] }[],
+    parent: AggregatedRow | null,
+    callIds: readonly number[],
     pathId: number,
     openStackId: number,
   ): Generator<void, AggregatedRow[], void> {
     const grouping: CalleeGrouping = {
-      calls,
+      parent,
+      callIds,
       pathId,
       openStackId,
       byKey: new Map(),
-      call: 0,
-      child: 0,
+      callAt: 0,
+      child: NOT_STARTED,
     };
     for (;;) {
-      budget -= groupCallees(grouping, paths, idFor, budget);
+      budget -= groupCallees(grouping, ctx, budget);
       if (budget > 0) {
         return Array.from(grouping.byKey.values());
       }
@@ -239,7 +346,7 @@ function* aggregatedSteps(
   }
 
   // Nothing is open above a root child, so no call of one is recursive here.
-  const roots = yield* group([{ children: rootChildren }], ROOT_PATH_ID, NO_STACK);
+  const roots = yield* group(null, LOG_CALL_IDS, ROOT_PATH_ID, NO_STACK);
   // Descend callees in grouping order, not sorted order: the row ids depend on it.
   const stack: AggregateFrame[] = [{ row: null, callees: roots, next: 0 }];
   while (stack.length > 0) {
@@ -247,7 +354,12 @@ function* aggregatedSteps(
     if (frame.next < frame.callees.length) {
       const row = frame.callees[frame.next++]!; // next is in range
       // The row's own frame is open over its callees, so a call of it there is recursive.
-      const callees = yield* group(row.instances, row._pathId, paths.stackIdOf(row.originalData));
+      const callees = yield* group(
+        row,
+        row.eventIds,
+        row._pathId,
+        ctx.paths.stackIdOf(row.eventId),
+      );
       stack.push({ row, callees, next: 0 });
       if (--budget === 0) {
         yield;
@@ -259,60 +371,63 @@ function* aggregatedSteps(
     stack.pop();
     if (frame.row) {
       frame.row._children = frame.callees.length > 0 ? frame.callees.sort(byTotalTimeDesc) : null;
-      finaliseAggregatedRow(frame.row, costLimits);
+      setGovernorCost(frame.row, ctx.costLimits);
     }
   }
 
   return roots.sort(byTotalTimeDesc);
 }
 
+/** {@link CalleeGrouping.child} before the call's first child is read. */
+const NOT_STARTED = -2;
+
 type CalleeGrouping = {
-  calls: readonly { children: LogEvent[] }[];
+  parent: AggregatedRow | null;
+  callIds: readonly number[];
   pathId: number;
   openStackId: number;
   byKey: Map<number, AggregatedRow>;
-  call: number;
+  callAt: number;
+  /** The next index row to group under `callIds[callAt]`. */
   child: number;
 };
 
 // Returns how many callees it grouped, at most `budget`.
-function groupCallees(
-  grouping: CalleeGrouping,
-  paths: KeyPathIds,
-  idFor: () => number,
-  budget: number,
-): number {
-  const { calls, pathId, openStackId, byKey } = grouping;
+function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: number): number {
+  const { index, paths, reported } = ctx;
+  const { subtreeEnd, eventId } = index;
+  const { parent, callIds, pathId, openStackId, byKey } = grouping;
   let done = 0;
-  let i = grouping.call;
-  let j = grouping.child;
-  for (; i < calls.length; i++, j = 0) {
-    const children = calls[i]!.children; // i is in range
-    for (; j < children.length; j++) {
+  let i = grouping.callAt;
+  let child = grouping.child;
+  for (; i < callIds.length; i++, child = NOT_STARTED) {
+    const callRow = index.rowOf(callIds[i]!); // i is in range; the log's id 0 reads NO_ROW
+    const end = callRow === NO_ROW ? index.rowCount : subtreeEnd[callRow]!;
+    if (child === NOT_STARTED) {
+      child = callRow + 1;
+    }
+    // A callee's span sits inside its call's, so a call that holds no point skips the search.
+    const usage = child < end && reported?.span(spanOf(index, callRow)) ? reported : null;
+    for (; child < end; child = subtreeEnd[child]!) {
       if (done === budget) {
-        grouping.call = i;
-        grouping.child = j;
+        grouping.callAt = i;
+        grouping.child = child;
         return done;
       }
       // Keyed by interned ids: the ones a mark matches rows on, hashed once per log.
-      const event = children[j]!; // j is in range
-      const keyId = paths.keyIdOf(event);
+      const id = eventId[child]!; // child is a row
+      const keyId = paths.keyIdOf(id);
       let row = byKey.get(keyId);
       if (!row) {
-        row = createEmptyAggregatedRow(
-          paths.keyText(keyId),
-          paths.step(pathId, keyId),
-          event,
-          idFor,
-        );
+        row = createEmptyAggregatedRow(ctx, paths.step(pathId, keyId), child, parent);
         byKey.set(keyId, row);
       }
-      addEventToAggregatedRow(row, event, paths.stackIdOf(event, keyId), openStackId);
+      addCallToAggregatedRow(row, ctx, child, paths.stackIdOf(id), openStackId, usage);
       done++;
     }
   }
-  grouping.call = i;
-  grouping.child = 0;
+  grouping.callAt = i;
+  grouping.child = NOT_STARTED;
   return done;
 }
 
@@ -323,53 +438,96 @@ function byTotalTimeDesc(a: AggregatedRow, b: AggregatedRow): number {
 /** No frame open above the level, so nothing in it can be a recursive call. */
 const NO_STACK = -1;
 
-/** Averages, governor cost and the Show Details roll-up, once `_children` is set. */
-function finaliseAggregatedRow(row: AggregatedRow, costLimits?: CostLimits): void {
-  calculateAverages(row);
-  if (costLimits) {
-    setGovernorCost(row, costLimits);
+// Most merged rows hold zero for most metrics, so a new row shares these until its first nonzero
+// write. Frozen, so a write that skips `added` or `addOwnReported` throws.
+const ZERO_TALLY: Tally = Object.freeze({ self: 0, total: 0 });
+const NO_REPORTED: ReportedCounts = Object.freeze(emptyReported());
+// Typed mutable to fit `eventIds`; a deep Bottom-Up bucket never pushes to it.
+const NO_EVENT_IDS = Object.freeze([]) as unknown as number[];
+
+/** `tally` with `self` and `total` added: a tally of its own once a value is nonzero. */
+function added(tally: Tally, self: number, total: number): Tally {
+  if (!self && !total) {
+    return tally;
   }
-  row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
+  if (tally === ZERO_TALLY) {
+    tally = { self: 0, total: 0 };
+  }
+  tally.self += self;
+  tally.total += total;
+  return tally;
 }
 
-/** Adds an event to an aggregated row, leaving `totalTime` alone where the call
- *  is recursive: the frame open above this level already holds that time. */
-function addEventToAggregatedRow(
+function anyReported(counts: ReportedCounts): boolean {
+  for (const metric of REPORTED_METRICS) {
+    if (counts[metric] !== 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function addOwnReported(row: { reported: ReportedCounts }, from: ReportedCounts): void {
+  if (row.reported === NO_REPORTED) {
+    if (!anyReported(from)) {
+      return;
+    }
+    row.reported = emptyReported();
+  }
+  addReported(row.reported, from);
+}
+
+/** `row`'s peak heap, as an integer while it fits one. */
+function peakBytes(m: RowMetrics, row: number): number {
+  const peak = m.heapPeak[row]!; // row < rowCount
+  // The column holds whole bytes as doubles, and one double in a row field made V8 convert every row.
+  return peak <= 0x7fffffff ? peak | 0 : peak;
+}
+
+function addTally(
+  tally: Tally,
+  from: SelfTotalColumns<Int32Array | Float64Array>,
+  callRow: number,
+): Tally {
+  return added(tally, from.self[callRow]!, from.total[callRow]!);
+}
+
+/** Adds the call on index row `callRow` to an aggregated row, leaving `totalTime` alone
+ *  where the call is recursive: the frame open above this level already holds that time. */
+function addCallToAggregatedRow(
   row: AggregatedRow,
-  event: LogEvent,
+  ctx: BuildContext,
+  callRow: number,
   stackId: number,
   openStackId: number,
+  reported: ReportedUsage | null,
 ): void {
+  const m = ctx.metrics;
   row.callCount++;
-  row.totalSelfTime += event.duration.self; // Always add self time
+  row.totalSelfTime += m.duration.self[callRow]!; // Always add self time
 
   // The stack id reads through the entry type, so CODE_UNIT_STARTED and
   // METHOD_ENTRY for the same method are one frame on the call stack.
   if (stackId !== openStackId) {
-    row.totalTime += event.duration.total;
+    row.totalTime += m.duration.total[callRow]!;
   }
 
-  row.dmlCount.self += event.dmlCount.self;
-  row.dmlCount.total += event.dmlCount.total;
-  row.soqlCount.self += event.soqlCount.self;
-  row.soqlCount.total += event.soqlCount.total;
-  row.soslCount.self += event.soslCount.self;
-  row.soslCount.total += event.soslCount.total;
-  row.dmlRowCount.self += event.dmlRowCount.self;
-  row.dmlRowCount.total += event.dmlRowCount.total;
-  row.soqlRowCount.self += event.soqlRowCount.self;
-  row.soqlRowCount.total += event.soqlRowCount.total;
-  row.soslRowCount.self += event.soslRowCount.self;
-  row.soslRowCount.total += event.soslRowCount.total;
-  row.thrownCount.self += event.thrownCount.self;
-  row.thrownCount.total += event.thrownCount.total;
-  row.heapAllocated.self += event.heapAllocated.self;
-  row.heapAllocated.total += event.heapAllocated.total;
-  row.heapGross.self += event.heapGross.self;
-  row.heapGross.total += event.heapGross.total;
+  row.dmlCount = addTally(row.dmlCount, m.dmlCount, callRow);
+  row.soqlCount = addTally(row.soqlCount, m.soqlCount, callRow);
+  row.soslCount = addTally(row.soslCount, m.soslCount, callRow);
+  row.dmlRowCount = addTally(row.dmlRowCount, m.dmlRowCount, callRow);
+  row.soqlRowCount = addTally(row.soqlRowCount, m.soqlRowCount, callRow);
+  row.soslRowCount = addTally(row.soslRowCount, m.soslRowCount, callRow);
+  row.thrownCount = addTally(row.thrownCount, m.thrownCount, callRow);
+  row.heapAllocated = addTally(row.heapAllocated, m.heapAllocated, callRow);
+  row.heapGross = addTally(row.heapGross, m.heapGross, callRow);
   // Peak live heap aggregates by max (the worst single call), not sum.
-  row.heapPeak = Math.max(row.heapPeak, event.heapPeak);
-  row.instances.push(event);
+  row.heapPeak = Math.max(row.heapPeak, peakBytes(m, callRow));
+  const span = reported?.span(spanOf(ctx.index, callRow));
+  if (span) {
+    addOwnReported(row, span);
+  }
+  row.eventIds.push(ctx.index.eventId[callRow]!);
 }
 
 /**
@@ -407,7 +565,8 @@ function addEventToAggregatedRow(
  *   - thrownCount.self / thrownCount.total
  */
 type FrameContext = {
-  frame: LogEvent;
+  /** The frame's index row. */
+  row: number;
   stackId: number;
   prior: FrameContext | undefined;
   // Attribution accumulator — initialised to the frame's own totals and
@@ -423,16 +582,14 @@ type FrameContext = {
   thrownTotal: number;
   heapTotal: number;
   heapGrossTotal: number;
-};
-
-type DfsEntry = {
-  node: LogEvent;
-  childIdx: number;
-  ctx: FrameContext;
+  /** Null where the span holds no reported point, or the log has no reported usage. */
+  reported: ReportedCounts | null;
 };
 
 /**
- * Single iterative DFS that fuses attribution computation with trie insertion.
+ * One pass over the index rows in pre-order that fuses attribution computation
+ * with trie insertion. The rows are in log order, so a frame closes when a row
+ * past its subtree comes up: no tree walk.
  *
  * Pre-order on entering N:
  *   - Take N's interned bucket key id from the log's table; push it onto the
@@ -443,92 +600,104 @@ type DfsEntry = {
  *
  * Post-order on leaving N:
  *   - N's `ctx` totals are now final. Insert N into the trie by walking the
- *     chain stack from top (= N) down to depth 0. The chain is the live DFS
- *     ancestor path, so no `frame.parent` walk and no per-step Map lookup is
+ *     chain stack from top (= N) down to depth 0. The chain is the live
+ *     ancestor path, so no parent walk and no per-step Map lookup is
  *     needed. Bucket-key comparisons are int equality on `_keyId`.
  *   - Restore `activeByStack[stackId]` from `ctx.prior`.
  *
  * Zero-delta guards on the DML/SOQL/row/thrown accumulators avoid the no-op
  * `bucket.x += 0` writes that dominate logs without heavy DB work.
  *
- * Yields after every {@link CHECK_EVERY} events and rows, so a caller can hand
+ * Yields after every {@link CHECK_EVERY} rows, so a caller can hand
  * the thread back between slices.
  */
-function* bottomUpSteps(
-  rootChildren: LogEvent[],
-  paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
-): Generator<void, BottomUpRow[], void> {
-  if (rootChildren.length === 0) {
+function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], void> {
+  const { index, metrics: m, paths, reported } = build;
+  if (index.rowCount === 0) {
     return [];
   }
 
+  const { eventId, subtreeEnd } = index;
   const rootBuckets = new Map<number, BottomUpRow>();
   const activeByStack = new Map<number, FrameContext>();
-  const dfs: DfsEntry[] = [];
+  // The frames open above the next row, outermost first.
+  const open: FrameContext[] = [];
   const chainIds: number[] = [];
 
-  // Per-build monotonic counter; row ids must be globally unique within this
-  // tree so deepFilter caches don't collide across cascaded subtree passes.
-  let next = 0;
-  const idFor = (): number => ++next;
-
-  const enter = (node: LogEvent): void => {
-    const keyId = paths.keyIdOf(node);
+  const enter = (row: number): void => {
+    const id = eventId[row]!; // row < rowCount
+    const keyId = paths.keyIdOf(id);
     chainIds.push(keyId);
 
-    const stackId = paths.stackIdOf(node, keyId);
+    const stackId = paths.stackIdOf(id);
     const prior = activeByStack.get(stackId);
+    const parent = open[open.length - 1];
+    // A span sits inside its parent's, so under a parent that holds no point the search is skipped.
+    const usage = !parent || parent.reported ? reported : null;
+    const totalTime = m.duration.total[row]!;
+    const dmlTotal = m.dmlCount.total[row]!;
+    const soqlTotal = m.soqlCount.total[row]!;
+    const soslTotal = m.soslCount.total[row]!;
+    const dmlRowTotal = m.dmlRowCount.total[row]!;
+    const soqlRowTotal = m.soqlRowCount.total[row]!;
+    const soslRowTotal = m.soslRowCount.total[row]!;
+    const thrownTotal = m.thrownCount.total[row]!;
+    const heapTotal = m.heapAllocated.total[row]!;
+    const heapGrossTotal = m.heapGross.total[row]!;
     const ctx: FrameContext = {
-      frame: node,
+      row,
       stackId,
       prior,
-      totalTime: node.duration.total,
-      dmlTotal: node.dmlCount.total,
-      soqlTotal: node.soqlCount.total,
-      soslTotal: node.soslCount.total,
-      dmlRowTotal: node.dmlRowCount.total,
-      soqlRowTotal: node.soqlRowCount.total,
-      soslRowTotal: node.soslRowCount.total,
-      thrownTotal: node.thrownCount.total,
-      heapTotal: node.heapAllocated.total,
-      heapGrossTotal: node.heapGross.total,
+      totalTime,
+      dmlTotal,
+      soqlTotal,
+      soslTotal,
+      dmlRowTotal,
+      soqlRowTotal,
+      soslRowTotal,
+      thrownTotal,
+      heapTotal,
+      heapGrossTotal,
+      reported: usage?.span(spanOf(index, row)) ?? null,
     };
 
     if (prior) {
-      prior.totalTime -= node.duration.total;
-      prior.dmlTotal -= node.dmlCount.total;
-      prior.soqlTotal -= node.soqlCount.total;
-      prior.soslTotal -= node.soslCount.total;
-      prior.dmlRowTotal -= node.dmlRowCount.total;
-      prior.soqlRowTotal -= node.soqlRowCount.total;
-      prior.soslRowTotal -= node.soslRowCount.total;
-      prior.thrownTotal -= node.thrownCount.total;
-      prior.heapTotal -= node.heapAllocated.total;
-      prior.heapGrossTotal -= node.heapGross.total;
+      prior.totalTime -= totalTime;
+      prior.dmlTotal -= dmlTotal;
+      prior.soqlTotal -= soqlTotal;
+      prior.soslTotal -= soslTotal;
+      prior.dmlRowTotal -= dmlRowTotal;
+      prior.soqlRowTotal -= soqlRowTotal;
+      prior.soslRowTotal -= soslRowTotal;
+      prior.thrownTotal -= thrownTotal;
+      prior.heapTotal -= heapTotal;
+      prior.heapGrossTotal -= heapGrossTotal;
+      if (prior.reported && ctx.reported) {
+        addReported(prior.reported, ctx.reported, -1);
+      }
     }
     activeByStack.set(stackId, ctx);
-    dfs.push({ node, childIdx: 0, ctx });
+    open.push(ctx);
   };
 
   const exit = (): void => {
-    const entry = dfs[dfs.length - 1]!;
-    const { node, ctx } = entry;
+    const ctx = open[open.length - 1]!;
+    const { row } = ctx;
 
     // Hoist invariants once for the chain walk.
-    const selfTime = node.duration.self;
-    const dmlSelf = node.dmlCount.self;
-    const soqlSelf = node.soqlCount.self;
-    const soslSelf = node.soslCount.self;
-    const dmlRowSelf = node.dmlRowCount.self;
-    const soqlRowSelf = node.soqlRowCount.self;
-    const soslRowSelf = node.soslRowCount.self;
-    const thrownSelf = node.thrownCount.self;
-    const heapSelf = node.heapAllocated.self;
-    const heapGrossSelf = node.heapGross.self;
+    const selfTime = m.duration.self[row]!;
+    const dmlSelf = m.dmlCount.self[row]!;
+    const soqlSelf = m.soqlCount.self[row]!;
+    const soslSelf = m.soslCount.self[row]!;
+    const dmlRowSelf = m.dmlRowCount.self[row]!;
+    const soqlRowSelf = m.soqlRowCount.self[row]!;
+    const soslRowSelf = m.soslRowCount.self[row]!;
+    const thrownSelf = m.thrownCount.self[row]!;
+    const heapSelf = m.heapAllocated.self[row]!;
+    const heapGrossSelf = m.heapGross.self[row]!;
     // Peak live heap composes by max, so (unlike the additive totals) it needs no
     // deepest-frame subtraction — just max this node's peak into every chain row.
-    const heapPeak = node.heapPeak;
+    const heapPeak = peakBytes(m, row);
     const totalTime = ctx.totalTime;
     const dmlTotal = ctx.dmlTotal;
     const soqlTotal = ctx.soqlTotal;
@@ -539,6 +708,17 @@ function* bottomUpSteps(
     const thrownTotal = ctx.thrownTotal;
     const heapTotal = ctx.heapTotal;
     const heapGrossTotal = ctx.heapGrossTotal;
+    // Checked once here, not per bucket on the chain.
+    const frameReported = ctx.reported && anyReported(ctx.reported) ? ctx.reported : null;
+    const hasDml = dmlSelf || dmlTotal;
+    const hasSoql = soqlSelf || soqlTotal;
+    const hasSosl = soslSelf || soslTotal;
+    const hasDmlRows = dmlRowSelf || dmlRowTotal;
+    const hasSoqlRows = soqlRowSelf || soqlRowTotal;
+    const hasSoslRows = soslRowSelf || soslRowTotal;
+    const hasThrown = thrownSelf || thrownTotal;
+    const hasHeap = heapSelf || heapTotal;
+    const hasHeapGross = heapGrossSelf || heapGrossTotal;
 
     // Closure captures the hoisted locals; zero-delta guards skip no-op writes
     // for logs without heavy DB work.
@@ -546,62 +726,38 @@ function* bottomUpSteps(
       b.callCount++;
       b.totalSelfTime += selfTime;
       b.totalTime += totalTime;
-      if (dmlSelf) {
-        b.dmlCount.self += dmlSelf;
+      if (hasDml) {
+        b.dmlCount = added(b.dmlCount, dmlSelf, dmlTotal);
       }
-      if (dmlTotal) {
-        b.dmlCount.total += dmlTotal;
+      if (hasSoql) {
+        b.soqlCount = added(b.soqlCount, soqlSelf, soqlTotal);
       }
-      if (soqlSelf) {
-        b.soqlCount.self += soqlSelf;
+      if (hasSosl) {
+        b.soslCount = added(b.soslCount, soslSelf, soslTotal);
       }
-      if (soqlTotal) {
-        b.soqlCount.total += soqlTotal;
+      if (hasDmlRows) {
+        b.dmlRowCount = added(b.dmlRowCount, dmlRowSelf, dmlRowTotal);
       }
-      if (soslSelf) {
-        b.soslCount.self += soslSelf;
+      if (hasSoqlRows) {
+        b.soqlRowCount = added(b.soqlRowCount, soqlRowSelf, soqlRowTotal);
       }
-      if (soslTotal) {
-        b.soslCount.total += soslTotal;
+      if (hasSoslRows) {
+        b.soslRowCount = added(b.soslRowCount, soslRowSelf, soslRowTotal);
       }
-      if (dmlRowSelf) {
-        b.dmlRowCount.self += dmlRowSelf;
+      if (hasThrown) {
+        b.thrownCount = added(b.thrownCount, thrownSelf, thrownTotal);
       }
-      if (dmlRowTotal) {
-        b.dmlRowCount.total += dmlRowTotal;
+      if (hasHeap) {
+        b.heapAllocated = added(b.heapAllocated, heapSelf, heapTotal);
       }
-      if (soqlRowSelf) {
-        b.soqlRowCount.self += soqlRowSelf;
-      }
-      if (soqlRowTotal) {
-        b.soqlRowCount.total += soqlRowTotal;
-      }
-      if (soslRowSelf) {
-        b.soslRowCount.self += soslRowSelf;
-      }
-      if (soslRowTotal) {
-        b.soslRowCount.total += soslRowTotal;
-      }
-      if (thrownSelf) {
-        b.thrownCount.self += thrownSelf;
-      }
-      if (thrownTotal) {
-        b.thrownCount.total += thrownTotal;
-      }
-      if (heapSelf) {
-        b.heapAllocated.self += heapSelf;
-      }
-      if (heapTotal) {
-        b.heapAllocated.total += heapTotal;
-      }
-      if (heapGrossSelf) {
-        b.heapGross.self += heapGrossSelf;
-      }
-      if (heapGrossTotal) {
-        b.heapGross.total += heapGrossTotal;
+      if (hasHeapGross) {
+        b.heapGross = added(b.heapGross, heapGrossSelf, heapGrossTotal);
       }
       if (heapPeak > b.heapPeak) {
         b.heapPeak = heapPeak;
+      }
+      if (frameReported) {
+        addOwnReported(b, frameReported);
       }
     };
 
@@ -610,31 +766,29 @@ function* bottomUpSteps(
     let bucket = rootBuckets.get(rootId);
     if (!bucket) {
       const pathId = paths.step(ROOT_PATH_ID, rootId);
-      bucket = createEmptyBottomUpRow(paths.keyText(rootId), rootId, pathId, node, idFor);
+      bucket = createEmptyBottomUpRow(build, pathId, row, null);
+      bucket.eventIds = [];
       rootBuckets.set(rootId, bucket);
     }
     accumulate(bucket);
-    bucket.instances.push(node);
+    bucket.eventIds.push(eventId[row]!);
 
-    // Deeper buckets are keyed by successive ancestors. The DFS stack already
-    // holds them — dfs[i].node is N's ancestor at depth i.
+    // Deeper buckets are keyed by successive ancestors. The open stack already
+    // holds them — open[i].row is N's ancestor at depth i.
     let parentBucket = bucket;
     for (let i = top - 1; i >= 0; i--) {
       const ancestorId = chainIds[i]!;
-      const ancestor = dfs[i]!.node;
-      const existingChildren = parentBucket._children ?? [];
-      let childBucket = existingChildren.find((c) => c._keyId === ancestorId);
+      const existingChildren = parentBucket._children;
+      let childBucket = existingChildren?.find((c) => c._keyId === ancestorId);
       if (!childBucket) {
         const pathId = paths.step(parentBucket._pathId, ancestorId);
-        childBucket = createEmptyBottomUpRow(
-          paths.keyText(ancestorId),
-          ancestorId,
-          pathId,
-          ancestor,
-          idFor,
-        );
-        existingChildren.push(childBucket);
-        parentBucket._children = existingChildren;
+        childBucket = createEmptyBottomUpRow(build, pathId, open[i]!.row, parentBucket);
+        // Most buckets have one caller: a literal holds one slot, where a push onto `[]` reserves 17.
+        if (existingChildren) {
+          existingChildren.push(childBucket);
+        } else {
+          parentBucket._children = [childBucket];
+        }
       }
       accumulate(childBucket);
       parentBucket = childBucket;
@@ -646,88 +800,78 @@ function* bottomUpSteps(
       activeByStack.delete(ctx.stackId);
     }
     chainIds.pop();
-    dfs.pop();
+    open.pop();
   };
 
-  // Drive one root tree to completion at a time. Each root is fully entered,
-  // descended, and exited before the next begins.
-  let entered = 0;
-  for (const root of rootChildren) {
-    enter(root);
-    while (dfs.length > 0) {
-      const cur = dfs[dfs.length - 1]!;
-      if (cur.childIdx < cur.node.children.length) {
-        const child = cur.node.children[cur.childIdx++]!;
-        enter(child);
-        if (++entered % CHECK_EVERY === 0) {
-          yield;
-        }
-      } else {
-        exit();
-      }
+  for (let row = 0; row < index.rowCount; row++) {
+    // Close every frame whose subtree ended before this row.
+    while (open.length > 0 && subtreeEnd[open[open.length - 1]!.row]! <= row) {
+      exit();
+    }
+    enter(row);
+    if ((row + 1) % CHECK_EVERY === 0) {
+      yield;
     }
   }
+  while (open.length > 0) {
+    exit();
+  }
 
-  return yield* finalizeBuckets(rootBuckets, governorLimits && costLimitsOf(governorLimits));
-}
-
-/** {@link bottomUpSteps} run to the end in one task. */
-export function toBottomUpTree(
-  rootChildren: LogEvent[],
-  paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
-): BottomUpRow[] {
-  return runSteps(bottomUpSteps(rootChildren, paths, governorLimits));
+  return yield* finalizeBuckets(rootBuckets, build.costLimits);
 }
 
 /**
- * {@link toBottomUpTree} in slices that hand the thread back between them (see
- * {@link FrameBudgetOptions}). Returns null once `options.signal` aborts.
+ * {@link bottomUpSteps} run to the end in one task.
+ *
+ * @param index - the shown rows of `store`
+ */
+export function toBottomUpTree(
+  index: LogIndex,
+  store: LogStore,
+  reported: ReportedUsage | null = null,
+): BottomUpRow[] {
+  return runSteps(bottomUpSteps(buildContext(index, store, reported)));
+}
+
+/**
+ * {@link toBottomUpTree} of the store's shown rows, in slices that hand the thread
+ * back between them (see {@link FrameBudgetOptions}). Returns null once
+ * `options.signal` aborts.
+ *
+ * @param rowsByKey - an empty map, filled with this build's rows by key; one build's only
  */
 export async function buildBottomUpTree(
-  rootChildren: LogEvent[],
-  paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
+  store: LogStore,
   options: FrameBudgetOptions = {},
+  reported: ReportedUsage | null = null,
+  rowsByKey?: Map<number, KeyRows<BottomUpRow>>,
 ): Promise<BottomUpRow[] | null> {
-  return driveSteps(bottomUpSteps(rootChildren, paths, governorLimits), options);
+  const index = await store.logIndex();
+  return driveSteps(bottomUpSteps(buildContext(index, store, reported, rowsByKey)), options);
 }
 
 /**
- * Walks the bucket trie computing averages and applying deterministic ordering
+ * Walks the bucket trie computing governor cost and applying deterministic ordering
  * (primary metric total-self desc, then name asc) at every level. Empty child
  * arrays are collapsed to null so a row with no children reads as a leaf.
  */
 function* finalizeBuckets(
   rootBuckets: Map<number, BottomUpRow>,
-  costLimits?: CostLimits,
+  costLimits: CostLimits,
 ): Generator<void, BottomUpRow[], void> {
   const roots = Array.from(rootBuckets.values());
-  // Pre-order, so walking it backwards meets every row after its children:
-  // _hasDetailsDeep reads theirs.
-  const order: BottomUpRow[] = [];
   const pending = roots.slice();
+  let done = 0;
   while (pending.length > 0) {
     const row = pending.pop()!; // the loop guard keeps it non-empty
-    order.push(row);
-    for (const child of row._children ?? []) {
-      pending.push(child);
-    }
-    if (order.length % CHECK_EVERY === 0) {
-      yield;
-    }
-  }
-  for (let i = order.length - 1; i >= 0; i--) {
-    const row = order[i]!; // i is in range
-    calculateBottomUpAverages(row);
-    if (costLimits) {
-      setGovernorCost(row, costLimits);
-    }
+    setGovernorCost(row, costLimits);
     if (row._children && row._children.length > 0) {
       sortBuckets(row._children);
+      for (const child of row._children) {
+        pending.push(child);
+      }
     }
-    row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.type);
-    if (i % CHECK_EVERY === 0) {
+    if (++done % CHECK_EVERY === 0) {
       yield;
     }
   }
@@ -745,90 +889,121 @@ function sortBuckets(rows: BottomUpRow[]): void {
   });
 }
 
+/**
+ * A row of either merged tree. The labels its signature shares and the average are read
+ * through getters, so a row holds 4 fields fewer than a plain object would.
+ */
+class MergedRow<C> {
+  declare id: number;
+  declare _pathId: number;
+  declare callerNamespace: string;
+  // A field, not a getter: group by namespace reads it on every row, and a getter made it slower.
+  declare namespace: string;
+  declare eventId: number;
+  declare category: LogCategory;
+  declare callCount: number;
+  declare totalSelfTime: number;
+  declare totalTime: number;
+  declare dmlCount: Tally;
+  declare soqlCount: Tally;
+  declare soslCount: Tally;
+  declare dmlRowCount: Tally;
+  declare soqlRowCount: Tally;
+  declare soslRowCount: Tally;
+  declare thrownCount: Tally;
+  declare heapAllocated: Tally;
+  declare heapGross: Tally;
+  declare heapPeak: number;
+  declare governorCost: number | null;
+  declare governorCostMax: number | null;
+  declare reported: ReportedCounts;
+  declare _parent: C | null;
+  declare _nextOfKey: C | null;
+  declare _children: C[] | null;
+  declare eventIds: number[];
+  declare private readonly _labels: SignatureLabels;
+
+  /** @param row - the index row of the row's first call */
+  constructor(
+    build: BuildContext,
+    pathId: number,
+    row: number,
+    parent: C | null,
+    eventIds: number[],
+  ) {
+    const { index } = build;
+    const eventId = index.eventId[row]!; // row < rowCount
+    // Assigned in one order, so every row shares one shape.
+    this.id = build.idFor();
+    this._pathId = pathId;
+    this._labels = build.labelsOf(eventId);
+    // Linked through the rows, not held in an array per key: an array's spare slots cost more.
+    const rows = this._labels.rows;
+    this._nextOfKey = (rows?.first as C | null | undefined) ?? null;
+    if (rows) {
+      rows.first = this;
+    }
+    this.callerNamespace = callerNamespaceOfRow(index, row);
+    this.namespace = this._labels.namespace;
+    this.eventId = eventId;
+    this.category = rowCategory(index, row);
+    this.callCount = 0;
+    this.totalSelfTime = 0;
+    this.totalTime = 0;
+    this.dmlCount = ZERO_TALLY;
+    this.soqlCount = ZERO_TALLY;
+    this.soslCount = ZERO_TALLY;
+    this.dmlRowCount = ZERO_TALLY;
+    this.soqlRowCount = ZERO_TALLY;
+    this.soslRowCount = ZERO_TALLY;
+    this.thrownCount = ZERO_TALLY;
+    this.heapAllocated = ZERO_TALLY;
+    this.heapGross = ZERO_TALLY;
+    this.heapPeak = 0;
+    // null, not 0, until set: a field that starts as an integer made V8 convert every row.
+    this.governorCost = null;
+    this.governorCostMax = null;
+    this.reported = NO_REPORTED;
+    this._parent = parent;
+    this._children = null;
+    this.eventIds = eventIds;
+  }
+
+  get key(): string {
+    return this._labels.key;
+  }
+
+  get _keyId(): number {
+    return this._labels.keyId;
+  }
+
+  get text(): string {
+    return this._labels.text;
+  }
+
+  get type(): string {
+    return this._labels.type;
+  }
+
+  get avgSelfTime(): number {
+    return this.callCount > 0 ? this.totalSelfTime / this.callCount : 0;
+  }
+}
+
 function createEmptyAggregatedRow(
-  key: string,
+  build: BuildContext,
   pathId: number,
-  event: LogEvent,
-  idFor: () => number,
+  row: number,
+  parent: AggregatedRow | null,
 ): AggregatedRow {
-  return {
-    id: idFor(),
-    key,
-    _pathId: pathId,
-    text: event.text,
-    namespace: event.namespace,
-    callerNamespace: getCallerNamespace(event),
-    type: event.type ?? '',
-    callCount: 0,
-    totalSelfTime: 0,
-    totalTime: 0,
-    avgSelfTime: 0,
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-    heapAllocated: { self: 0, total: 0 },
-    heapGross: { self: 0, total: 0 },
-    heapPeak: 0,
-    governorCost: 0,
-    governorCostMax: 0,
-    _children: null,
-    instances: [],
-    originalData: event,
-    _hasDetailsDeep: false,
-  };
+  return new MergedRow<AggregatedRow>(build, pathId, row, parent, []);
 }
 
 function createEmptyBottomUpRow(
-  key: string,
-  keyId: number,
+  build: BuildContext,
   pathId: number,
-  event: LogEvent,
-  idFor: () => number,
+  row: number,
+  parent: BottomUpRow | null,
 ): BottomUpRow {
-  return {
-    id: idFor(),
-    key,
-    _keyId: keyId,
-    _pathId: pathId,
-    text: event.text,
-    namespace: event.namespace,
-    callerNamespace: getCallerNamespace(event),
-    type: event.type ?? '',
-    callCount: 0,
-    totalSelfTime: 0,
-    totalTime: 0,
-    avgSelfTime: 0,
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-    heapAllocated: { self: 0, total: 0 },
-    heapGross: { self: 0, total: 0 },
-    heapPeak: 0,
-    governorCost: 0,
-    governorCostMax: 0,
-    _children: null,
-    instances: [],
-    originalData: event,
-    _hasDetailsDeep: false,
-  };
-}
-
-function calculateAverages(row: AggregatedRow): void {
-  if (row.callCount > 0) {
-    row.avgSelfTime = row.totalSelfTime / row.callCount;
-  }
-}
-
-function calculateBottomUpAverages(row: BottomUpRow): void {
-  if (row.callCount > 0) {
-    row.avgSelfTime = row.totalSelfTime / row.callCount;
-  }
+  return new MergedRow<BottomUpRow>(build, pathId, row, parent, NO_EVENT_IDS);
 }

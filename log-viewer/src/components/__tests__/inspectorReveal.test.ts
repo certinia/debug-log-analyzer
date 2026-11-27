@@ -21,7 +21,7 @@ describe('dispatchInspectorReveal', () => {
 
     const seen: number[] = [];
     document.addEventListener(INSPECTOR_REVEAL_EVENT, (e) => {
-      seen.push((e as InspectorRevealEvent).detail.eventIndex);
+      seen.push((e as InspectorRevealEvent).detail.eventId);
     });
 
     dispatchInspectorReveal(section, 42);

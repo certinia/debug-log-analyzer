@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 export interface Mounted {
   mount(host: HTMLElement, log: ApexLog): Promise<void>;
@@ -24,8 +24,8 @@ interface Table extends Mounted {
 export interface Contender extends Table {
   sortSelfDesc(): void | Promise<void>;
   setDetailFilter(on: boolean): void | Promise<void>;
-  /** Expands to, scrolls to and selects the row for `event`. */
-  goTo(event: LogEvent): Promise<void>;
+  /** Expands to, scrolls to and selects the row at `path`, event ids from the root down. */
+  goTo(path: readonly number[]): Promise<void>;
   setColumnVisible(field: string, visible: boolean): void | Promise<void>;
   setNameWidth(px: number): void;
 }

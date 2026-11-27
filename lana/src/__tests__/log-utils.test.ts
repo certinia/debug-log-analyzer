@@ -2,9 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
+import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 
 import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
-import { createMockLogEvent } from './helpers/test-builders.js';
 
 describe('log-utils', () => {
   describe('formatDuration', () => {
@@ -56,6 +56,18 @@ describe('log-utils', () => {
   });
 
   describe('buildMetricParts', () => {
+    /** The fields `buildMetricParts` reads; a count is null where the log level did not record it. */
+    const createMockLogEvent = (fields: Record<string, unknown>): ApexEvent =>
+      ({
+        duration: { self: 0, total: 0 },
+        soqlCount: { self: 0, total: 0 },
+        soqlRowCount: { self: 0, total: 0 },
+        dmlCount: { self: 0, total: 0 },
+        dmlRowCount: { self: 0, total: 0 },
+        thrownCount: { self: 0, total: 0 },
+        ...fields,
+      }) as unknown as ApexEvent;
+
     it.each([
       [1_000_000_000, 1_000_000_000, '**1.00s**'],
       [100_000_000, 100_000_000, '**100.00ms**'],
@@ -95,6 +107,12 @@ describe('log-utils', () => {
         expect(buildMetricParts(event)).toEqual(['**0.00ms**']);
       },
     );
+
+    it('omits a count the log level did not record', () => {
+      const event = createMockLogEvent({ soqlCount: null, dmlCount: null, thrownCount: null });
+
+      expect(buildMetricParts(event)).toEqual(['**0.00ms**']);
+    });
 
     it('orders every metric after the duration', () => {
       const event = createMockLogEvent({

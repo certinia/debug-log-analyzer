@@ -5,7 +5,7 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
@@ -130,5 +130,10 @@ export class HeaderMenu extends LitElement {
     if (activated) {
       this.shadowRoot?.querySelector<AnchoredPopover>('anchored-popover')?.close();
     }
+  }
+
+  /** Focus the `•••` trigger. */
+  override focus(options?: FocusOptions): void {
+    this.shadowRoot?.querySelector<AnchoredPopover>('anchored-popover')?.focus(options);
   }
 }

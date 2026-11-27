@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { SelectionView } from '../core/events/EventBus.js';
+import type { SelectionView } from '#core/events/EventBus.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
 // The switch options are the source of the union, so the guard below can't drift.

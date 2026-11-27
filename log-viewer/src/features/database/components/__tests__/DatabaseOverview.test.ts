@@ -8,7 +8,7 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { LitElement } from 'lit';
 
 import type { StackedTimeBar } from '../../../../components/StackedTimeBar.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type {
   DatabaseBreakdown,
   DatabaseCallNode,
@@ -32,11 +32,11 @@ import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../Databas
 import '../DatabaseOverview.js';
 import { stubStore } from '#test-helpers/apexLog.js';
 import { settledNote } from '#test-helpers/sections.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
 
 const emptyOverview = (): DatabaseOverview => ({
   time: {
     timeNs: 0,
-    logNs: 1_000_000_000,
     percentOfLog: 0,
     soql: { timeNs: 0, statements: 0 },
     dml: { timeNs: 0, statements: 0 },
@@ -53,8 +53,8 @@ const emptyOverview = (): DatabaseOverview => ({
 // database total.
 const statements = (): DatabaseStatement[] => [
   {
-    eventIndex: 11,
-    eventIndexes: [11],
+    eventId: 11,
+    eventIds: [11],
     kind: 'SOQL',
     label: 'SELECT Id FROM Account',
     sObject: 'Account',
@@ -66,8 +66,8 @@ const statements = (): DatabaseStatement[] => [
     repeats: 1,
   },
   {
-    eventIndex: 22,
-    eventIndexes: [22, 23, 24],
+    eventId: 22,
+    eventIds: [22, 23, 24],
     kind: 'DML',
     label: 'Update Case',
     sObject: 'Case',
@@ -79,8 +79,8 @@ const statements = (): DatabaseStatement[] => [
     repeats: 3,
   },
   {
-    eventIndex: 33,
-    eventIndexes: [33],
+    eventId: 33,
+    eventIds: [33],
     kind: 'SOQL',
     label: 'SELECT Name FROM Contact',
     sObject: 'Contact',
@@ -98,7 +98,7 @@ const node = (part: Partial<DatabaseCallNode> & { label: string }): DatabaseCall
   timeNs: 0,
   selfNs: 0,
   count: 1,
-  eventIndexes: [],
+  eventIds: [],
   children: [],
   ...part,
 });
@@ -109,13 +109,13 @@ const tree = (): DatabaseCallNode[] => [
     timeNs: 300_000_000,
     // A frame's self time is its own code, every child excluded.
     selfNs: 20_000_000,
-    eventIndexes: [2],
+    eventIds: [2],
     children: [
       node({
         label: 'TaskService.run()',
         timeNs: 300_000_000,
         selfNs: 30_000_000,
-        eventIndexes: [5, 6],
+        eventIds: [5, 6],
         count: 2,
         children: [
           node({
@@ -123,21 +123,21 @@ const tree = (): DatabaseCallNode[] => [
             kind: 'SOQL',
             timeNs: 150_000_000,
             selfNs: 150_000_000,
-            eventIndexes: [11],
+            eventIds: [11],
           }),
           node({
             label: 'Update Case',
             kind: 'DML',
             timeNs: 150_000_000,
             selfNs: 100_000_000,
-            eventIndexes: [22],
+            eventIds: [22],
             children: [
               node({
                 label: 'SELECT Name FROM Contact',
                 kind: 'SOQL',
                 timeNs: 50_000_000,
                 selfNs: 50_000_000,
-                eventIndexes: [33],
+                eventIds: [33],
               }),
             ],
           }),
@@ -150,7 +150,6 @@ const tree = (): DatabaseCallNode[] => [
 const fullOverview = (): DatabaseOverview => ({
   time: {
     timeNs: 300_000_000,
-    logNs: 1_000_000_000,
     percentOfLog: 30,
     soql: { timeNs: 200_000_000, statements: 2 },
     dml: { timeNs: 100_000_000, statements: 1 },
@@ -189,10 +188,11 @@ const namespaceSplit = (): DatabaseBreakdown[] => [
 
 async function mount<K extends keyof HTMLElementTagNameMap>(
   tag: K,
+  store: LogStore = stubStore(apexLog),
 ): Promise<HTMLElementTagNameMap[K] & LitElement> {
   const element = document.createElement(tag);
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = stubStore(apexLog);
+  (element as unknown as { logStore: LogStore }).logStore = store;
   document.body.append(element);
   await (element as LitElement).updateComplete;
   // The derived value lands a microtask after the render that asks for it.
@@ -231,7 +231,7 @@ describe('databaseTreeRows', () => {
       timeNs: 150_000_000,
       selfNs: 100_000_000,
       count: 1,
-      eventIndexes: [22],
+      eventIds: [22],
     });
     // A frame has no kind, carries its own code as self time, and merges its calls.
     expect(rows[1]).toMatchObject({
@@ -239,7 +239,7 @@ describe('databaseTreeRows', () => {
       timeNs: 300_000_000,
       selfNs: 30_000_000,
       count: 2,
-      eventIndexes: [5, 6],
+      eventIds: [5, 6],
     });
   });
 
@@ -316,7 +316,7 @@ describe('database-concentration', () => {
     const element = await mount('database-concentration');
     const located: number[][] = [];
     document.addEventListener('inspector-locate', (event) => {
-      located.push((event as CustomEvent<{ eventIndexes: number[] }>).detail.eventIndexes);
+      located.push((event as CustomEvent<{ eventIds: number[] }>).detail.eventIds);
     });
 
     element.shadowRoot
@@ -329,8 +329,8 @@ describe('database-concentration', () => {
   it('accounts for the statements past the rows it shows', async () => {
     const many = fullOverview();
     many.ranked = Array.from({ length: 10 }, (_ignored, index) => ({
-      eventIndex: index,
-      eventIndexes: [index],
+      eventId: index,
+      eventIds: [index],
       kind: 'SOQL' as const,
       label: `SELECT Id FROM Object${index}`,
       sObject: `Object${index}`,
@@ -363,7 +363,7 @@ describe('database-concentration', () => {
     const element = await mount('database-concentration');
     const revealed: number[] = [];
     document.addEventListener('inspector-reveal', (event) => {
-      revealed.push((event as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+      revealed.push((event as CustomEvent<{ eventId: number }>).detail.eventId);
     });
 
     element.shadowRoot?.querySelector<HTMLButtonElement>('.reveal-row')?.click();
@@ -490,4 +490,15 @@ describe('database-namespaces', () => {
       'no database statements',
     );
   });
+
+  it.each(['database-namespaces', 'database-concentration'] as const)(
+    '%s names the DB level a log was captured below',
+    async (tag) => {
+      overview = emptyOverview();
+      const gap = findLevelGap('queries', { database: 'NONE' }, { database: 'NONE' });
+      const store = Object.assign(stubStore(apexLog), { levelGap: () => gap });
+
+      expect(await settledNote(await mount(tag, store))).toBe(describeLevelGap(gap));
+    },
+  );
 });

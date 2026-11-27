@@ -7,14 +7,16 @@
  * Order tree is the default. `window.bench.runAll()` returns medians per action; the
  * page shows them too.
  */
-import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
+import { parse, type ApexLog } from '@apexdevtools/apex-log-parser';
+
+import { logStoreFor } from '../../src/core/log/LogStore.js';
 
 import { LvGridAggregated } from './aggregated-contenders.js';
 import { LvGridBottomUp } from './bottom-up-contenders.js';
 import type { BottomUpContender, Contender, MergedContender, Mounted } from './contender.js';
 import { GridContender } from './grid-contender.js';
 import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
-import { deepEvent } from './targets.js';
+import { deepRow, pathOf } from './targets.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
 // No contender runs Tabulator: it is gone, and `baseline/` holds the figures it last gave.
@@ -77,7 +79,8 @@ let contender: Contender;
 let bottomUp: MergedContender;
 let grouped: BottomUpContender | null = null;
 let log: ApexLog;
-let target: LogEvent;
+/** The id path to the deepest row in the middle of the log. */
+let target: number[];
 const results: Record<string, unknown> = { contender: name, tree };
 
 /** Records a timing under `key`, and says it. */
@@ -98,13 +101,13 @@ const frames = (list: FrameStats[]): FrameStats => ({
   dropped: median(list.map((f) => f.dropped)),
 });
 
-async function load(text: string): Promise<void> {
+async function load(bytes: Uint8Array): Promise<void> {
   const t0 = performance.now();
-  log = parse(text);
-  target = deepEvent(log);
-  say(
-    `parsed in ${Math.round(performance.now() - t0)}ms; goTo target depth event ${target.eventIndex}`,
-  );
+  log = await parse(bytes);
+  const parseMs = Math.round(performance.now() - t0);
+  const index = await logStoreFor(log).logIndex();
+  target = pathOf(index, deepRow(index));
+  say(`parsed in ${parseMs}ms; goTo target depth ${target.length} event ${target.at(-1)}`);
   await settled();
 
   if (tree === 'bottom-up') {
@@ -292,6 +295,6 @@ const bench = {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (file) {
     say(`loading ${file.name} (${Math.round(file.size / 1048576)}MB) for ${name}`);
-    void file.text().then(load);
+    void file.arrayBuffer().then((buffer) => load(new Uint8Array(buffer)));
   }
 });

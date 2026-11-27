@@ -10,7 +10,6 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { Container, type Mesh } from 'pixi.js';
 
 import { readQuads } from '#test-helpers/mesh.js';
-import { timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import type { RenderBatch } from '../../../types/flamechart.types.js';
 import type { PrecomputedRect } from '../../RectangleCache.js';
@@ -31,14 +30,12 @@ const batches = new Map<string, RenderBatch>([
 
 function rect(x: number, category: Category, width = 100): PrecomputedRect {
   return {
-    id: `${category}-${x}`,
     timeStart: x,
     timeEnd: x + width,
     depth: 0,
     duration: width,
-    selfDuration: width,
     category,
-    eventRef: timelineEvent(x, width, category),
+    row: x,
     x,
     y: 0,
     width,
@@ -73,7 +70,7 @@ describe('category dim', () => {
         ['Apex', [apex]],
         ['SOQL', [rect(200, 'SOQL')]],
       ]),
-      new Set([apex.id]),
+      new Set([apex.row]),
       new Map(),
       viewport,
       [],

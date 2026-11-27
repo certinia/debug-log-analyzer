@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { LogStatus } from '../../core/log/logStatus.js';
+import type { LogStatus } from '#core/log/logStatus.js';
 import type { GridSkeleton } from '../GridSkeleton.js';
 import '../GridSkeleton.js';
 

@@ -1,8 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 import { describe, expect, it } from '@jest/globals';
-import { createEvent } from '#test-helpers/events.js';
+
+import { rawStoreOf } from '#test-helpers/apexLog.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { eventLabel, eventName, formatCallStack, formatEventDetails } from '../eventText.js';
 
@@ -14,124 +16,155 @@ const limits = governorLimits({
   soslQueries: limitValue(0, 20),
 });
 
+const SETTINGS = '64.0 APEX_CODE,FINEST;WORKFLOW,FINEST;VALIDATION,INFO;SYSTEM,FINE;DB,FINEST\n';
+
+/** Every event `lines` parse to, in log order; each line is `<nanoseconds>|<rest>`. */
+async function eventsOf(...lines: string[]): Promise<ApexEvent[]> {
+  const body = lines.map((line) => `09:18:22.6 (${line.replace('|', ')|')}\n`).join('');
+  const { log } = await rawStoreOf(body, SETTINGS);
+  return [...log.events];
+}
+
+async function firstEventOf(...lines: string[]): Promise<ApexEvent> {
+  return (await eventsOf(...lines))[0]!; // every case writes at least one event
+}
+
+const method = (start: number, end: number, name: string, ...inner: string[]): string[] => [
+  `${start}|METHOD_ENTRY|[1]|01p|${name}`,
+  ...inner,
+  `${end}|METHOD_EXIT|[1]|${name}`,
+];
+
 describe('eventName', () => {
-  it('appends the suffix when present', () => {
-    expect(eventName(createEvent({ text: 'MyClass.run()' }))).toBe('MyClass.run()');
-    expect(eventName(createEvent({ text: 'MyClass.run()', suffix: ' (exception)' }))).toBe(
-      'MyClass.run() (exception)',
+  it('is the text alone for a method', async () => {
+    expect(eventName(await firstEventOf(...method(1000, 2000, 'MyClass.run()')))).toBe(
+      'MyClass.run()',
     );
+  });
+
+  // The suffix tells a constructor from a method of the same text.
+  it('appends the suffix of a constructor', async () => {
+    const event = await firstEventOf(
+      '1000|CONSTRUCTOR_ENTRY|[5]|01p|<init>()|c2g.AbstractTaxHandler',
+      '2000|CONSTRUCTOR_EXIT|[5]|01p|<init>()|c2g.AbstractTaxHandler',
+    );
+
+    expect(eventName(event)).toBe('c2g.AbstractTaxHandler() (constructor)');
+  });
+
+  // The suffix comes from the code unit above, so a lookup by type alone gets it wrong.
+  it('names what started flow interviews', async () => {
+    const events = await eventsOf(
+      '1000|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:Account',
+      '1100|FLOW_START_INTERVIEWS_BEGIN|1',
+      '1200|FLOW_START_INTERVIEWS_END|1',
+      '1300|CODE_UNIT_FINISHED|Workflow:Account',
+    );
+
+    expect(eventName(events[1]!)).toBe('FLOW_START_INTERVIEWS_BEGIN (Process Builder)');
   });
 });
 
 describe('eventLabel', () => {
-  it('leaves text that identifies itself alone', () => {
-    expect(
-      eventLabel(createEvent({ text: 'fflib_SObjectDomain.triggerHandler(System.Type)' })),
-    ).toBe('fflib_SObjectDomain.triggerHandler(System.Type)');
-    // The suffix is what disambiguates, not the raw type.
+  it('leaves text that identifies itself alone', async () => {
     expect(
       eventLabel(
-        createEvent({
-          text: 'c2g.AbstractTaxHandler',
-          type: 'CONSTRUCTOR_ENTRY',
-          suffix: ' (constructor)',
-        }),
+        await firstEventOf(
+          ...method(1000, 2000, 'fflib_SObjectDomain.triggerHandler(System.Type)'),
+        ),
       ),
-    ).toBe('c2g.AbstractTaxHandler (constructor)');
+    ).toBe('fflib_SObjectDomain.triggerHandler(System.Type)');
   });
 
-  it('falls back to the type when the text cannot stand alone', () => {
-    // A lone boolean, a lone number, or no text at all.
-    expect(eventLabel(createEvent({ text: 'false', type: 'SYSTEM_MODE_ENTER' }))).toBe(
+  it('prefixes the type to a lone boolean', async () => {
+    expect(eventLabel(await firstEventOf('1000|SYSTEM_MODE_ENTER|false'))).toBe(
       'SYSTEM_MODE_ENTER: false',
     );
-    expect(eventLabel(createEvent({ text: '17', type: 'STATEMENT_EXECUTE' }))).toBe(
-      'STATEMENT_EXECUTE: 17',
-    );
-    expect(eventLabel(createEvent({ text: '', type: 'VALIDATION_PASS' }))).toBe('VALIDATION_PASS');
   });
 
-  it('does not repeat the type when the text already is the type', () => {
-    expect(eventLabel(createEvent({ text: 'EXECUTION_STARTED', type: 'EXECUTION_STARTED' }))).toBe(
-      'EXECUTION_STARTED',
-    );
+  it('is the type alone, once, for an event with no text', async () => {
+    expect(eventLabel(await firstEventOf('1000|VALIDATION_PASS'))).toBe('VALIDATION_PASS');
+    expect(eventLabel(await firstEventOf('1000|EXECUTION_STARTED'))).toBe('EXECUTION_STARTED');
   });
 });
 
 describe('formatEventDetails', () => {
-  it('reports name, type and duration with self time', () => {
-    const event = createEvent({
-      text: 'MyClass.run()',
-      total: 5_000_000,
-      self: 2_000_000,
-      // The duration is only reported for a frame that exited.
-      exitStamp: 1000,
-    });
+  it('reports name, type and duration with self time', async () => {
+    const event = await firstEventOf(
+      ...method(0, 5_000_000, 'MyClass.run()', ...method(2_000_000, 5_000_000, 'MyClass.inner()')),
+    );
+
     expect(formatEventDetails(event)).toBe(
       ['Name: MyClass.run()', 'Type: METHOD_ENTRY', 'Duration: 5 ms (self 2 ms)'].join('\n'),
     );
   });
 
-  it('omits duration when the frame never exited', () => {
-    const event = createEvent({ text: 'MyClass.run()', total: 5_000_000, exitStamp: null });
-    expect(formatEventDetails(event)).toBe('Name: MyClass.run()\nType: METHOD_ENTRY');
+  it('omits duration for a leaf, which spans no time', async () => {
+    expect(formatEventDetails(await firstEventOf('1000|SYSTEM_MODE_ENTER|false'))).toBe(
+      'Name: false\nType: SYSTEM_MODE_ENTER',
+    );
   });
 
-  it('includes only non-zero governor metrics, against their limits', () => {
-    const event = createEvent({
-      text: 'SELECT Id FROM Account',
-      type: 'SOQL_EXECUTE_BEGIN',
-      total: 1_000_000,
-      exitStamp: 1000,
-      soqlTotal: 1,
-      soqlSelf: 1,
-      soqlRowTotal: 300,
-      soqlRowSelf: 300,
-    });
+  it('includes only non-zero governor metrics, against their limits', async () => {
+    const event = await firstEventOf(
+      '0|SOQL_EXECUTE_BEGIN|[1]|Aggregations:0|SELECT Id FROM Account',
+      '1000000|SOQL_EXECUTE_END|[1]|Rows:300',
+    );
+
     const details = formatEventDetails(event, limits);
+
     expect(details).toContain('SOQL: 1/100 (self 1)');
     expect(details).toContain('SOQL Rows: 300/50000 (self 300)');
-    // No DML on this frame, so no DML lines at all.
     expect(details).not.toContain('DML');
   });
 
-  it('meters SOSL rows against the per-query cap, not the query-count limit', () => {
-    const sosl = createEvent({
-      text: 'FIND {Acme}',
-      type: 'SOSL_EXECUTE_BEGIN',
-      soslRowTotal: 137,
-      soslRowSelf: 137,
-    });
-    // 20 is the SOSL *query* limit — using it here would read "137/20".
-    expect(formatEventDetails(sosl, limits)).toContain('SOSL Rows: 137/2000 (self 137)');
+  it('meters SOSL rows against the per-query cap, not the query-count limit', async () => {
+    const [outer, sosl] = await eventsOf(
+      ...method(
+        0,
+        3000,
+        'MyClass.search()',
+        '1000|SOSL_EXECUTE_BEGIN|[1]|FIND {Acme}',
+        '2000|SOSL_EXECUTE_END|[1]|Rows:137',
+      ),
+    );
 
+    // 20 is the SOSL *query* limit — using it here would read "137/20".
+    expect(formatEventDetails(sosl!, limits)).toContain('SOSL Rows: 137/2000 (self 137)');
     // A method that merely contains SOSL work has no per-query cap to report.
-    const method = createEvent({ text: 'MyClass.search()', soslRowTotal: 137, soslRowSelf: 0 });
-    expect(formatEventDetails(method, limits)).toContain('SOSL Rows: 137 (self 0)');
+    expect(formatEventDetails(outer!, limits)).toContain('SOSL Rows: 137 (self 0)');
   });
 
-  it('drops the limit denominator when no limits are supplied', () => {
-    const event = createEvent({ text: 'Insert:Account', dmlTotal: 1, dmlSelf: 1 });
+  it('drops the limit denominator when no limits are supplied', async () => {
+    const event = await firstEventOf(
+      '0|DML_BEGIN|[1]|Op:Insert|Type:Account|Rows:1',
+      '1000|DML_END|[1]',
+    );
+
     expect(formatEventDetails(event)).toContain('DML: 1 (self 1)');
   });
 });
 
 describe('formatCallStack', () => {
-  it('lists the lineage outermost first, one frame per line', () => {
-    const root = createEvent({ text: 'execute_anonymous_apex', type: 'CODE_UNIT_STARTED' });
-    const middle = createEvent({ text: 'MyClass.run()', parent: root });
-    const leaf = createEvent({
-      text: 'SELECT Id FROM Account',
-      type: 'SOQL_EXECUTE_BEGIN',
-      parent: middle,
-    });
+  it('lists the lineage outermost first, one frame per line', async () => {
+    const events = await eventsOf(
+      '0|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex',
+      ...method(
+        1000,
+        4000,
+        'MyClass.run()',
+        '2000|SOQL_EXECUTE_BEGIN|[1]|Aggregations:0|SELECT Id FROM Account',
+        '3000|SOQL_EXECUTE_END|[1]|Rows:0',
+      ),
+      '5000|CODE_UNIT_FINISHED|execute_anonymous_apex',
+    );
 
-    expect(formatCallStack(leaf)).toBe(
-      ['execute_anonymous_apex', 'MyClass.run()', 'SELECT Id FROM Account'].join('\n'),
+    expect(formatCallStack(events[2]!)).toBe(
+      ['execute_anonymous_apex (code unit)', 'MyClass.run()', 'SELECT Id FROM Account'].join('\n'),
     );
   });
 
-  it('returns just the frame when it has no parent', () => {
-    expect(formatCallStack(createEvent({ text: 'lonely()' }))).toBe('lonely()');
+  it('returns just the frame when it has no parent', async () => {
+    expect(formatCallStack(await firstEventOf(...method(0, 1000, 'lonely()')))).toBe('lonely()');
   });
 });

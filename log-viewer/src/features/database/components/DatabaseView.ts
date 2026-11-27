@@ -6,25 +6,19 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import type {
-  ApexLog,
-  DMLBeginLine,
-  SOQLExecuteBeginLine,
-  SOSLExecuteBeginLine,
-  Limits,
-} from '@apexdevtools/apex-log-parser';
+import type { ApexLog, LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
-import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import { eventBus, type StatementType } from '#core/events/EventBus.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
-import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { formatInteger, isVisible } from '../../../core/utility/Util.js';
+import { FindController } from '../../find/FindController.js';
+import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import { formatInteger, isVisible } from '#core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { logContext } from '../../../core/log/logContext.js';
-import { statements } from '../../../core/log/statements.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import { statements, type DmlEvent, type SoqlEvent, type SoslEvent } from '#core/log/statements.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -61,11 +55,11 @@ export class DatabaseView extends LitElement {
   }
 
   @state()
-  private dmlLines: DMLBeginLine[] = [];
+  private dmlLines: DmlEvent[] = [];
   @state()
-  private soqlLines: SOQLExecuteBeginLine[] = [];
+  private soqlLines: SoqlEvent[] = [];
   @state()
-  private soslLines: SOSLExecuteBeginLine[] = [];
+  private soslLines: SoslEvent[] = [];
   @state()
   private loaded = false;
 
@@ -77,8 +71,8 @@ export class DatabaseView extends LitElement {
   private _echoGuard = new SelectionEchoGuard();
 
   // The widget counts the three grids' matches as one list, in view order.
-  private readonly _finder = new LvGridFindController(this, {
-    grids: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
+  private readonly _finder = new FindController(this, {
+    targets: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
     unfold: async (grid) => {
       const kind = this._gridsByKind.find(([, view]) => view?.grid === grid)?.[0];
       if (kind && this.collapsed[kind]) {
@@ -89,18 +83,18 @@ export class DatabaseView extends LitElement {
   });
 
   private readonly _inspector = new InspectorTabController(this, 'database', {
-    mark: (eventIndexes) => this._markLocated(eventIndexes),
-    // The eventIndex belongs to exactly one grid.
-    reveal: (eventIndex) => {
+    mark: (eventIds) => this._markLocated(eventIds),
+    // The eventId belongs to exactly one grid.
+    reveal: (eventId) => {
       const views = this._views;
-      const owner = views.find((view) => view?.owns(eventIndex));
+      const owner = views.find((view) => view?.owns(eventId));
       if (!owner) {
         return;
       }
       void this._echoGuard.runAsync(async () => {
         // The owner too: a filter can hide the row, and its old pick must not stay.
         views.forEach((view) => view?.deselectRows());
-        await owner.selectByEventIndex(eventIndex);
+        await owner.selectByEventId(eventId);
       });
     },
     clear: () => {
@@ -111,8 +105,8 @@ export class DatabaseView extends LitElement {
   });
 
   /** Offers the mark to every grid, since one of them owns the statement. */
-  private _markLocated(eventIndexes: readonly number[]): void {
-    this._views.forEach((view) => view?.markLocated(eventIndexes));
+  private _markLocated(eventIds: readonly number[]): void {
+    this._views.forEach((view) => view?.markLocated(eventIds));
   }
 
   /**
@@ -125,8 +119,8 @@ export class DatabaseView extends LitElement {
     if (this._echoGuard.suppressed) {
       return;
     }
-    const { type, eventIndex } = event.detail;
-    if (eventIndex === null) {
+    const { type, eventId } = event.detail;
+    if (eventId === null) {
       // A mark a picked inspector row left here goes with the selection: it was
       // never a selection of these grids.
       this._inspector.dropPick();
@@ -142,7 +136,7 @@ export class DatabaseView extends LitElement {
     });
     eventBus.emit('detail:select', {
       source: 'database',
-      selection: { kind: 'event', eventIndex, type },
+      selection: { kind: 'event', eventId, type },
     });
   }
 
@@ -157,7 +151,7 @@ export class DatabaseView extends LitElement {
     this.renderRoot.addEventListener('grid-locate', (event) =>
       eventBus.emit('detail:locate', {
         source: 'database',
-        eventIndexes: (event as GridLocateEvent).detail.eventIndexes,
+        eventIds: (event as GridLocateEvent).detail.eventIds,
       }),
     );
   }
@@ -337,17 +331,17 @@ export class DatabaseView extends LitElement {
 
   /** Cumulative limits are only present when the log recorded a usage snapshot. */
   private get _hasLimits(): boolean {
-    return (this.timelineRoot?.governorLimits.snapshots.length ?? 0) > 0;
+    return (this.timelineRoot?.limits.snapshots.length ?? 0) > 0;
   }
 
   private _rows(kind: SectionKind): number {
     switch (kind) {
       case 'dml':
-        return this.dmlLines.reduce((sum, l) => sum + l.dmlRowCount.self, 0);
+        return this.dmlLines.reduce((sum, l) => sum + (l.dmlRowCount?.self ?? 0), 0);
       case 'soql':
-        return this.soqlLines.reduce((sum, l) => sum + l.soqlRowCount.self, 0);
+        return this.soqlLines.reduce((sum, l) => sum + (l.soqlRowCount?.self ?? 0), 0);
       case 'sosl':
-        return this.soslLines.reduce((sum, l) => sum + l.soslRowCount.self, 0);
+        return this.soslLines.reduce((sum, l) => sum + (l.soslRowCount?.self ?? 0), 0);
     }
   }
 
@@ -364,8 +358,8 @@ export class DatabaseView extends LitElement {
   }
 
   /** Without a snapshot the limit is the platform default, which is a guess here, so hide it. */
-  private _limit(value: number): number {
-    return this._hasLimits ? value : 0;
+  private _limit(value: number | null): number {
+    return this._hasLimits ? (value ?? 0) : 0;
   }
 
   private _isEmpty(kind: SectionKind): boolean {
@@ -419,7 +413,7 @@ export class DatabaseView extends LitElement {
     }
     const limits = this._limits;
     const gauges: GaugeMetric[] = [];
-    const add = (label: string, found: number, metric: { used: number; limit: number }) => {
+    const add = (label: string, found: number, metric: Pick<LimitValue, 'used' | 'limit'>) => {
       gauges.push({
         label,
         found,
@@ -441,8 +435,8 @@ export class DatabaseView extends LitElement {
 interface SectionSpec {
   title: string;
   statementLabel: string;
-  statement: (limits: Limits) => { used: number; limit: number };
-  rows: (limits: Limits) => { used: number; limit: number };
+  statement: (limits: Limits) => LimitValue;
+  rows: (limits: Limits) => LimitValue;
 }
 
 // Which governor each type reconciles against. Order of use is DML, SOQL, SOSL —

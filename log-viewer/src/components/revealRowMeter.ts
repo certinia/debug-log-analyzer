@@ -3,7 +3,7 @@
  */
 import { html } from 'lit';
 
-import { formatDuration } from '../core/utility/Util.js';
+import { formatDuration } from '#core/utility/Util.js';
 
 /** One named part of a row's bar: its share of the log, and what it stands for. */
 export interface MeterPart {

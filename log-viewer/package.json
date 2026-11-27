@@ -5,18 +5,20 @@
   "scripts": {},
   "version": "0.1.0",
   "imports": {
+    "#core/*": "./src/core/*",
+    "#test-helpers/*": "./src/__tests__/helpers/*",
     "#vscode-elements/*.js": "@vscode-elements/elements/dist/*/index.js"
   },
   "dependencies": {
-    "@apexdevtools/apex-log-parser": "0.3.0",
-    "@apexdevtools/apex-parser": "5.2.0",
+    "@apexdevtools/apex-log-parser": "0.5.0",
+    "@apexdevtools/apex-parser": "5.3.0",
     "@lit/context": "^1.1.6",
     "@lit/task": "^1.0.3",
-    "@tanstack/virtual-core": "^3.17.11",
+    "@tanstack/virtual-core": "^3.19.11",
     "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.45",
     "lit": "^3.3.3",
-    "pixi.js": "^8.22.0"
+    "pixi.js": "^8.23.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

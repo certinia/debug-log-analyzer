@@ -11,7 +11,9 @@ export {
   max,
   sum,
   type Calc,
+  type FindDirection,
   type FindQuery,
+  type GridExpansion,
   type GroupBy,
   type RowFilter,
   type RowKey,
@@ -32,4 +34,5 @@ export {
   type GridRowDetail,
   type GridSelectDetail,
   type GridSort,
+  type GoToResult,
 } from './ui/index.js';

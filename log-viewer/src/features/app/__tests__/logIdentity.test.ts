@@ -37,53 +37,53 @@ function unit(name: string, startNs: number, endNs: number): string {
   );
 }
 
-function identity(rawLog: string) {
-  return deriveLogIdentity(parse(rawLog));
+async function identity(rawLog: string) {
+  return deriveLogIdentity(await parse(rawLog));
 }
 
 describe('entry point', () => {
-  it('maps anonymous apex to a friendly label, keeping the raw text as the detail', () => {
+  it('maps anonymous apex to a friendly label, keeping the raw text as the detail', async () => {
     const log = transaction(
       '09:18:22.6 (7000000)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex\n',
     );
 
-    expect(identity(log).entryPoint).toEqual({
+    expect((await identity(log)).entryPoint).toEqual({
       label: 'Anonymous Apex',
       detail: 'execute_anonymous_apex',
     });
   });
 
-  it('shows a VF page by its page name', () => {
+  it('shows a VF page by its page name', async () => {
     const log = transaction(
       '09:18:22.6 (7000000)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|VF: /apex/SiteLogin\n',
     );
 
-    expect(identity(log).entryPoint?.label).toBe('VF SiteLogin');
+    expect((await identity(log)).entryPoint?.label).toBe('VF SiteLogin');
   });
 
-  it('shows a trigger by its name, from the "on" form', () => {
+  it('shows a trigger by its name, from the "on" form', async () => {
     const log = transaction(
       '09:18:22.6 (7000000)|CODE_UNIT_STARTED|[EXTERNAL]|01qd0000000LOhy|MyTrigger on Account trigger event BeforeInsert|__sfdc_trigger/MyTrigger\n',
     );
 
-    expect(identity(log).entryPoint?.label).toBe('Trigger MyTrigger');
+    expect((await identity(log)).entryPoint?.label).toBe('Trigger MyTrigger');
   });
 
-  it('shows a trigger by its name, from the raw path form', () => {
+  it('shows a trigger by its name, from the raw path form', async () => {
     const log = transaction(
       '09:18:22.6 (7000000)|CODE_UNIT_STARTED|[EXTERNAL]|__sfdc_trigger/ns/MyTrigger\n',
     );
 
-    expect(identity(log).entryPoint?.label).toBe('Trigger MyTrigger');
+    expect((await identity(log)).entryPoint?.label).toBe('Trigger MyTrigger');
   });
 
-  it('names the longest of several entry points, listing them longest first', () => {
+  it('names the longest of several entry points, listing them longest first', async () => {
     const log = execution(
       unit('FutureHandler - state load', 7_000_000, 9_000_000) +
         unit('execute_anonymous_apex', 10_000_000, 1_210_000_000),
     );
 
-    expect(identity(log).entryPoint).toEqual({
+    expect((await identity(log)).entryPoint).toEqual({
       label: 'Anonymous Apex',
       detail:
         '2 entry points, longest first: Anonymous Apex (1.2 s) · FutureHandler - state load (2 ms)',
@@ -91,12 +91,12 @@ describe('entry point', () => {
     });
   });
 
-  it('lists only the five longest entry points', () => {
+  it('lists only the five longest entry points', async () => {
     const units = [1, 2, 3, 4, 5, 6, 7].map((n) =>
       unit(`Unit${n}`, n * 10_000_000, n * 11_000_000),
     );
 
-    expect(identity(execution(units.join(''))).entryPoint).toEqual({
+    expect((await identity(execution(units.join('')))).entryPoint).toEqual({
       label: 'Unit7',
       detail:
         '7 entry points, longest first: Unit7 (7 ms) · Unit6 (6 ms) · Unit5 (5 ms) · Unit4 (4 ms) · Unit3 (3 ms) · +2 more',
@@ -104,26 +104,26 @@ describe('entry point', () => {
     });
   });
 
-  it('names the first entry point when two are equally long', () => {
+  it('names the first entry point when two are equally long', async () => {
     const log = execution(
       unit('First', 7_000_000, 9_000_000) + unit('Second', 10_000_000, 12_000_000),
     );
 
-    expect(identity(log).entryPoint?.label).toBe('First');
+    expect((await identity(log)).entryPoint?.label).toBe('First');
   });
 
-  it('is null when the log has no code unit', () => {
+  it('is null when the log has no code unit', async () => {
     const log = USER_INFO_LINE + '09:18:22.6 (6574780)|EXECUTION_STARTED\n';
 
-    expect(identity(log).entryPoint).toBeNull();
+    expect((await identity(log)).entryPoint).toBeNull();
   });
 });
 
 describe('user and start time', () => {
   const anonymous = '09:18:22.6 (7000000)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex\n';
 
-  it('reads the user from USER_INFO, and puts its timezone on the start time', () => {
-    const { user, startTime } = identity(transaction(anonymous));
+  it('reads the user from USER_INFO, and puts its timezone on the start time', async () => {
+    const { user, startTime } = await identity(transaction(anonymous));
 
     expect(user).toEqual({ label: 'tina.owen', detail: 'tina.owen@example.com' });
     expect(startTime?.label).toBe('09:18:22');
@@ -132,51 +132,53 @@ describe('user and start time', () => {
     );
   });
 
-  it('keeps the offset when the header names no timezone', () => {
+  it('keeps the offset when the header names no timezone', async () => {
     const log = transaction(
       anonymous,
       '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz|tina.owen@example.com|(GMT+05:30)|GMT+05:30\n',
     );
 
-    expect(identity(log).startTime?.detail).toMatch(/^Started 09:18:22\S* \(GMT\+05:30\)$/);
+    expect((await identity(log)).startTime?.detail).toMatch(/^Started 09:18:22\S* \(GMT\+05:30\)$/);
   });
 
-  it('shows a bare timezone label as the log states it', () => {
+  it('shows a bare timezone label as the log states it', async () => {
     const log = transaction(
       anonymous,
       '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz|tina.owen@example.com|Pacific Standard Time|GMT-08:00\n',
     );
 
-    expect(identity(log).startTime?.detail).toMatch(/^Started 09:18:22\S* Pacific Standard Time$/);
+    expect((await identity(log)).startTime?.detail).toMatch(
+      /^Started 09:18:22\S* Pacific Standard Time$/,
+    );
   });
 
-  it('omits the user when USER_INFO states no name, keeping its timezone', () => {
+  it('omits the user when USER_INFO states no name, keeping its timezone', async () => {
     const log = transaction(
       anonymous,
       '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz||(GMT-07:00) Pacific Daylight Time (America/Los_Angeles)|GMT-07:00\n',
     );
 
-    const { user, startTime } = identity(log);
+    const { user, startTime } = await identity(log);
 
     expect(user).toBeNull();
     expect(startTime?.detail).toContain('Pacific Daylight Time');
   });
 
-  it('omits the user when the log states no USER_INFO', () => {
-    const { user, startTime } = identity(transaction(anonymous, ''));
+  it('omits the user when the log states no USER_INFO', async () => {
+    const { user, startTime } = await identity(transaction(anonymous, ''));
 
     expect(user).toBeNull();
     expect(startTime?.detail).toMatch(/^Started 09:18:22\S*$/);
   });
 
-  it('derives nothing from an empty log', () => {
-    expect(identity('')).toEqual({ entryPoint: null, user: null, startTime: null });
+  it('derives nothing from an empty log', async () => {
+    expect(await identity('')).toEqual({ entryPoint: null, user: null, startTime: null });
   });
 
-  it('keeps the user when the echoed source states |EXECUTION_STARTED', () => {
+  it('keeps the user when the echoed source states |EXECUTION_STARTED', async () => {
     const echo = "Execute Anonymous: String s = '|EXECUTION_STARTED';\n";
 
-    const { user, startTime } = identity(transaction(anonymous, echo + USER_INFO_LINE));
+    const { user, startTime } = await identity(transaction(anonymous, echo + USER_INFO_LINE));
 
     expect(user).toEqual({ label: 'tina.owen', detail: 'tina.owen@example.com' });
     expect(startTime?.detail).toMatch(

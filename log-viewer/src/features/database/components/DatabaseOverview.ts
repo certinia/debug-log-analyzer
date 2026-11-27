@@ -14,11 +14,12 @@ import {
 import { logNamespacePalette } from '../../../components/namespacePalette.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
-import { DerivedValue } from '../../../core/log/DerivedValue.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { nsToMs } from '../../../core/utility/Duration.js';
-import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { nsToMs } from '#core/utility/Duration.js';
+import { formatDuration, formatInteger, sharePercent } from '#core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import '../../../components/SectionSkeleton.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
@@ -172,7 +173,7 @@ export class DatabaseConcentration extends LitElement {
       return html`<section-skeleton
         shape="rows"
         ?pending=${this._overview.pending}
-        fallback=${NO_STATEMENTS}
+        fallback=${describeLevelGap(this.logStore?.levelGap('queries'), NO_STATEMENTS)}
       ></section-skeleton>`;
     }
     const { count, percent } = concentration(overview);
@@ -227,8 +228,8 @@ export class DatabaseConcentration extends LitElement {
           // its descendants.
           '--self-pct': `${sharePercent(statement.selfNs, statement.timeNs).toFixed(1)}%`,
         })}
-        @click=${() => dispatchInspectorReveal(this, statement.eventIndex)}
-        @pointerenter=${() => dispatchInspectorLocate(this, statement.eventIndexes)}
+        @click=${() => dispatchInspectorReveal(this, statement.eventId)}
+        @pointerenter=${() => dispatchInspectorLocate(this, statement.eventIds)}
         @pointerleave=${() => dispatchInspectorLocate(this, [])}
       >
         <span class="reveal-row__sr">${statement.kind}</span>
@@ -294,7 +295,7 @@ export class DatabaseNamespaces extends LitElement {
       return html`<section-skeleton
         shape="rows"
         ?pending=${this._overview.pending}
-        fallback=${NO_STATEMENTS}
+        fallback=${describeLevelGap(this.logStore?.levelGap('queries'), NO_STATEMENTS)}
       ></section-skeleton>`;
     }
     // The log's own palette, so a namespace that moves between the two bars is

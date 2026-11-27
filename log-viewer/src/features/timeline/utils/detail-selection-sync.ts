@@ -7,12 +7,12 @@
  * side-effect free so both directions can be unit tested without a PixiJS
  * flame chart instance.
  */
-import type { DetailSelection } from '../../../core/events/EventBus.js';
+import type { DetailSelection } from '#core/events/EventBus.js';
 import type { ViewportBounds, ViewportPanAxes } from '../types/flamechart.types.js';
 
-/** The `detail:select` payload for a frame, or null when it carries no eventIndex. */
-export function toDetailSelection(eventIndex: number | undefined): DetailSelection | null {
-  return eventIndex === undefined ? null : { kind: 'event', eventIndex };
+/** The `detail:select` payload for a frame, or null when it carries no eventId. */
+export function toDetailSelection(eventId: number | undefined): DetailSelection | null {
+  return eventId === undefined ? null : { kind: 'event', eventId };
 }
 
 /**

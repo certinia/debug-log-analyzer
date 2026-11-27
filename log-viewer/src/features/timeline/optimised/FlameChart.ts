@@ -6,11 +6,9 @@
  * FlameChart - Generic flamechart visualization component
  *
  * Generic rendering engine for hierarchical time-based data.
- * Works with any data via LogEvent interface (kept for simplicity).
  * Apex-specific logic is handled via callbacks.
  */
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import { DimState } from './DimState.js';
@@ -23,6 +21,7 @@ import type {
   HeatStripTimeSeries,
   HoverCause,
   ModifierKeys,
+  TimelineExtent,
   TimelineFrames,
   TimelineMarker,
   TimelineOptions,
@@ -33,12 +32,7 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  MatchedEventInfo,
-  SearchCursor,
-  SearchOptions,
-} from '../types/search.types.js';
+import type { FramePredicate, SearchCursor } from '../types/search.types.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
@@ -60,9 +54,9 @@ import { RectangleCache, type PrecomputedRect } from './RectangleCache.js';
 import { cssColorToPixi } from './rendering/ColorUtils.js';
 import { hexToCSS } from './rendering/tooltip-utils.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
-import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { ViewportAnimator } from './ViewportAnimator.js';
+import { chartOverheadHeight } from './chartLayout.js';
 
 // Orchestrators (own domain-specific state and rendering)
 import { MeasurementOrchestrator } from './orchestrators/MeasurementOrchestrator.js';
@@ -81,7 +75,7 @@ import {
   METRIC_STRIP_GAP,
   MetricStripOrchestrator,
 } from './metric-strip/MetricStripOrchestrator.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 
 /**
  * How long to let a container settle before giving up on it. Bounded, so a container that
@@ -142,6 +136,8 @@ export interface FlameChartCallbacks {
   onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
   /** Called when Escape asks to drop the category highlight. Returns whether the owner dropped any. */
   onCategoryDimClear?: () => boolean;
+  /** Called, in place of clearing, when Escape drops a search: the find that made it owns it. */
+  onSearchClear?: () => void;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -149,7 +145,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private container: HTMLElement | null = null;
   private wrapper: HTMLDivElement | null = null;
   private viewport: TimelineViewport | null = null;
-  private index: TimelineEventIndex | null = null;
+  private index: TimelineExtent | null = null;
   private state: TimelineState | null = null;
   private options: TimelineOptions = {};
   private callbacks: FlameChartCallbacks = {};
@@ -231,7 +227,6 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Initialize the flamechart renderer.
    *
    * @param container - HTML element to render into
-   * @param events - Array of LogEvent objects for rendering
    * @param frames - The frames to draw, navigate and search
    * @param markers - Timeline markers (truncation regions, etc.)
    * @param options - Rendering options
@@ -239,7 +234,6 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public async init(
     container: HTMLElement,
-    events: LogEvent[],
     frames: TimelineFrames<E>,
     markers: TimelineMarker[] = [],
     options: TimelineOptions = {},
@@ -251,10 +245,6 @@ export class FlameChart<E extends EventNode = EventNode> {
         TimelineErrorCode.INVALID_CONTAINER,
         'Container must be a valid HTML element',
       );
-    }
-
-    if (!events || !Array.isArray(events)) {
-      throw new TimelineError(TimelineErrorCode.INVALID_EVENT_DATA, 'Events must be an array');
     }
 
     // Check WebGL availability
@@ -276,10 +266,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     const { width, height } = await this.awaitContainerSize(container);
 
-    this.index = new TimelineEventIndex(events, {
-      maxDepth: frames.maxDepth,
-      totalDuration: frames.totalDuration,
-    });
+    this.index = frames;
 
     // Initialize PixiJS Application first - creates DOM and measures dimensions after RAF.
     // This ensures flex layout is computed before we measure mainDiv's actual height.
@@ -301,7 +288,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.setupCoordinateSystem();
 
     // Initialize state
-    this.initializeState(events);
+    this.initializeState();
 
     this.frames = frames;
 
@@ -335,11 +322,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create RectangleCache (single source of truth for rectangle computation)
     if (this.state) {
-      const categories = new Set(this.state.batches.keys());
-      this.rectangleManager = new RectangleCache(events, categories, {
-        rectsByCategory: frames.rectsByCategory,
-        rectsByDepth: frames.rectsByDepth,
-      });
+      this.rectangleManager = new RectangleCache(frames);
     }
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleCache)
@@ -349,7 +332,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create text label renderer (renders method names on rectangles)
     if (this.worldContainer && this.state) {
-      this.textLabelRenderer = new TextLabelRenderer(this.worldContainer);
+      this.textLabelRenderer = new TextLabelRenderer(this.worldContainer, (row) =>
+        frames.text(row),
+      );
       await this.textLabelRenderer.loadFont();
       this.textLabelRenderer.setBatches(this.state.batches);
 
@@ -374,13 +359,16 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create hit test manager for mouse interactions
     // Pass rectangleManager for O(log n) hit testing queries
-    this.hitDetector = new HitDetector({
-      index: this.index,
-      visibleRects: new Map(),
-      buckets: new Map(),
-      markerRenderer: this.markerRenderer,
-      rectangleManager: this.rectangleManager,
-    });
+    if (this.rectangleManager) {
+      this.hitDetector = new HitDetector({
+        nodeOf: (row) => frames.node(row).data,
+        columns: frames,
+        visibleRects: new Map(),
+        buckets: new Map(),
+        markerRenderer: this.markerRenderer,
+        rectangleManager: this.rectangleManager,
+      });
+    }
 
     // Initialize selection orchestrator (owns selection state and rendering)
     this.setupSelection(frames);
@@ -654,15 +642,20 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Search events using predicate function.
-   * Returns FlameChartCursor that automatically handles centering, tooltips, and rendering.
+   * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
-   * @returns FlameChartCursor for navigating results, or null if search not enabled
+   * @returns The number of matches, or null if search not enabled or a newer search stopped it
    */
-  public search(predicate: FramePredicate, options?: SearchOptions): SearchCursor<E> | null {
-    return this.searchOrchestrator?.search(predicate, options) ?? null;
+  public async search(predicate: FramePredicate): Promise<number | null> {
+    return (await this.searchOrchestrator?.search(predicate)) ?? null;
+  }
+
+  /**
+   * Make match `index` (from 0) current: centre on it and show its panel. -1 makes none current.
+   */
+  public setCurrentMatch(index: number): void {
+    this.searchOrchestrator?.setCurrentMatch(index);
   }
 
   /**
@@ -834,10 +827,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     const metricStripHeight = metricStripVisible
       ? (this.metricStripOrchestrator?.getHeight() ?? METRIC_STRIP_COLLAPSED_HEIGHT)
       : 0;
-    const metricStripGap = metricStripVisible ? METRIC_STRIP_GAP : 0;
 
     // Calculate main timeline height by subtracting all visible component heights
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + metricStripGap;
+    const totalOverheadHeight = chartOverheadHeight(minimapHeight, metricStripHeight);
     const mainTimelineHeight = newHeight - totalOverheadHeight;
 
     if (mainTimelineHeight <= 0) {
@@ -1051,7 +1043,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // This is the applied geometry, so a resize to the same size has nothing to do.
     this.appliedMinimapHeight = minimapHeight;
-    this.appliedOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
+    this.appliedOverheadHeight = chartOverheadHeight(minimapHeight, metricStripHeight);
 
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');
@@ -1093,8 +1085,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Calculate main timeline height by subtracting fixed component heights.
     // At init time, all components are visible (metric strip hides later via setHeatStripTimeSeries).
-    const mainTimelineHeight =
-      height - minimapHeight - MINIMAP_GAP - metricStripHeight - METRIC_STRIP_GAP;
+    const mainTimelineHeight = height - this.appliedOverheadHeight;
 
     if (mainTimelineHeight <= 0) {
       throw new TimelineError(
@@ -1321,7 +1312,7 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.selectionOrchestrator.clearSelection();
         } else if (!(this.dimState.legendShowing() && this.callbacks.onCategoryDimClear?.())) {
           // Falls through when only a chip under the pointer lights the legend: nothing to drop.
-          this.clearSearch();
+          this.callbacks.onSearchClear?.();
         }
       },
       onMarkerNav: (direction: MarkerNavDirection) => {
@@ -1411,7 +1402,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Setup minimap orchestrator for Chrome DevTools-style overview navigation.
    */
   private async setupMinimap(): Promise<void> {
-    if (!this.index || !this.rectangleManager || !this.viewport || !this.minimapDiv) {
+    if (!this.frames || !this.viewport || !this.minimapDiv) {
       return;
     }
 
@@ -1470,8 +1461,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.minimapDiv,
       displayWidth,
       containerHeight,
-      this.index,
-      this.rectangleManager,
+      this.frames,
       this.viewport,
       minimapEditorColors
         ? {
@@ -2132,22 +2122,17 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public locateByEventNodes(eventNodes: readonly EventNode[]): void {
     const frames = this.frames;
-    const ids = new Set<string>();
-    const info: MatchedEventInfo[] = [];
+    const rows = new Set<number>();
+    const spans: PrecomputedRect[] = [];
     for (const node of eventNodes) {
       const rect = frames?.rectOf(frames.rowOfOriginal(node.original));
       if (!rect) {
         continue;
       }
-      ids.add(rect.id);
-      info.push({
-        timestamp: rect.timeStart,
-        duration: rect.duration,
-        depth: rect.depth,
-        category: rect.category,
-      });
+      rows.add(rect.row);
+      spans.push(rect);
     }
-    if (this.dimState.setEmphasis(ids, info)) {
+    if (this.dimState.setEmphasis(rows, spans)) {
       this.requestRender();
     }
   }
@@ -2294,7 +2279,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     );
   }
 
-  private initializeState(events: LogEvent[]): void {
+  private initializeState(): void {
     if (!this.viewport) {
       return;
     }
@@ -2323,7 +2308,6 @@ export class FlameChart<E extends EventNode = EventNode> {
     const batchColorsCache = this.buildBatchColorsCache(batches);
 
     this.state = {
-      events,
       viewport: this.viewport.getState(),
       batches,
       batchColorsCache,
@@ -2526,8 +2510,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.searchOrchestrator!.renderStyledLabels(searchContext);
       this.batchRenderer?.clear();
     } else if (dim && this.searchOrchestrator) {
-      this.searchOrchestrator.renderDimmedExcept(searchContext, dim.ids, dim.info, dim.categories);
-      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.ids, dim.categories);
+      this.searchOrchestrator.renderDimmedExcept(
+        searchContext,
+        dim.rows,
+        dim.spans,
+        dim.categories,
+      );
+      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.rows, dim.categories);
       this.batchRenderer?.clear();
     } else {
       // Normal mode: render with original colors

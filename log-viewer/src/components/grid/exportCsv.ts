@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { saveFile } from '../../core/messaging/saveFile.js';
+import { saveFile } from '#core/messaging/saveFile.js';
 import type { LvGrid } from '../../grid/index.js';
 
 // The byte order mark tells Excel the file is UTF-8.

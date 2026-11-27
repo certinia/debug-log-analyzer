@@ -5,12 +5,13 @@ import { consume } from '@lit/context';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import { WindowStatsController } from '../core/log/windowStats.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import { WINDOW_UNREADABLE_TEXT, WindowStatsController } from '#core/log/windowStats.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { apexLimitSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
 import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
 import { seriesGauges } from './logOverviewMetrics.js';
 
@@ -43,7 +44,7 @@ export class LogOverview extends LitElement {
   @property({ type: Boolean })
   wholeLog = false;
 
-  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
+  private readonly _window = new WindowStatsController(this, () => this.logStore ?? null);
 
   static styles = [
     globalStyles,
@@ -74,13 +75,19 @@ export class LogOverview extends LitElement {
         ?pending=${this._series.pending}
       ></section-skeleton>`;
     }
-    if (!this.wholeLog && this._window.pending) {
-      return html`<p class="note">Adding up the governor usage…</p>`;
+    if (!this.wholeLog) {
+      if (this._window.pending) {
+        return html`<p class="note">Adding up the governor usage…</p>`;
+      }
+      if (this._window.failed) {
+        return html`<p class="note">${WINDOW_UNREADABLE_TEXT}</p>`;
+      }
     }
     const window = this.wholeLog ? null : this._window.counts;
     const gauges = seriesGauges(series, window ?? undefined);
     if (!gauges.length) {
-      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
+      const text = describeLevelGap(this.logStore?.levelGap('limits'), NO_GOVERNOR_USAGE_TEXT);
+      return html`<p class="note">${text}</p>`;
     }
 
     // A gauge with no reported limit says so on hover, so the strip needs no note beneath it.

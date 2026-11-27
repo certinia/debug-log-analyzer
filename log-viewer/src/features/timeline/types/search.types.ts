@@ -5,29 +5,32 @@
 /**
  * Search-related type definitions for timeline search functionality.
  *
- * Provides generic interfaces for search matches, cursor navigation,
- * and search options, decoupled from specific event implementations.
+ * Provides generic interfaces for search matches and cursor navigation,
+ * decoupled from specific event implementations.
  */
 
-import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import type { EventNode } from './flamechart.types.js';
 
 /** Tests a frame by its text and type, so a search reads strings rather than nodes. */
 export type FramePredicate = (text: string, type: string) => boolean;
 
 /**
- * Lightweight info about a matched event for bucket search highlighting.
- * Used instead of full SearchMatch to avoid exposing event details to renderers.
+ * Where a matched frame sits, for bucket search highlighting. A search match and a
+ * rect both are one, so neither is copied into another object.
  */
-export interface MatchedEventInfo {
-  /** Event start time in nanoseconds */
-  timestamp: number;
-  /** Event duration in nanoseconds */
-  duration: number;
+export interface MatchSpan {
+  /** Start time in nanoseconds */
+  readonly timeStart: number;
   /** Depth in the event tree (0-indexed) */
-  depth: number;
-  /** Event subcategory for color resolution */
-  category: string;
+  readonly depth: number;
+  /** Category, for colour */
+  readonly category: string;
+}
+
+/** A set of frames by row, as a search or an emphasis holds them. */
+export interface RowSet {
+  readonly size: number;
+  has(row: number): boolean;
 }
 
 /**
@@ -37,8 +40,17 @@ export interface SearchMatch<E extends EventNode> {
   /** The matched event */
   readonly event: E;
 
-  /** Pre-computed rectangle for rendering; `rect.id` is `event.id` */
-  readonly rect: PrecomputedRect;
+  /** The matched frame's row */
+  readonly row: number;
+
+  /** Start time in nanoseconds */
+  readonly timeStart: number;
+
+  /** Duration in nanoseconds */
+  readonly duration: number;
+
+  /** Category, for colour */
+  readonly category: string;
 
   /** Depth in the event tree (0-indexed) */
   readonly depth: number;
@@ -56,56 +68,24 @@ export interface SearchMatch<E extends EventNode> {
  */
 export interface SearchCursor<E extends EventNode> {
   // State (readonly)
-  /** All search matches in traversal order */
+  /** All search matches in traversal order; the same array for the cursor's life, as renderers cache on it */
   readonly matches: ReadonlyArray<SearchMatch<E>>;
 
-  /** Current position in matches array (0-indexed, -1 if empty) */
+  /** Current position in matches array (0-indexed), -1 until a step moves to one */
   readonly currentIndex: number;
 
   /** Total number of matches */
   readonly total: number;
 
   // Navigation methods
-  /** Move to next match, returns match or null if at end */
-  next(): SearchMatch<E> | null;
-
-  /** Move to previous match, returns match or null if at start */
-  prev(): SearchMatch<E> | null;
-
-  /** Jump to first match, returns match or null if empty */
-  first(): SearchMatch<E> | null;
-
-  /** Jump to last match, returns match or null if empty */
-  last(): SearchMatch<E> | null;
-
-  /** Seek to specific index, returns match or null if out of bounds */
+  /** Seek to specific index, returns match or null if out of bounds; -1 makes none current */
   seek(index: number): SearchMatch<E> | null;
 
   // Query methods
   /** Get current match without moving cursor */
   getCurrent(): SearchMatch<E> | null;
 
-  /** Check if there's a next match */
-  hasNext(): boolean;
-
-  /** Check if there's a previous match */
-  hasPrev(): boolean;
-
   // Rendering support
-  /** Get set of matched event IDs for desaturation rendering */
-  getMatchedEventIds(): ReadonlySet<string>;
-
-  /** Get lightweight info about matched events for bucket search highlighting */
-  getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo>;
-}
-
-/**
- * Options for search behavior.
- */
-export interface SearchOptions {
-  /** Enable case-sensitive search (default: false) */
-  caseSensitive?: boolean;
-
-  /** Match whole words only (default: false) */
-  matchWholeWord?: boolean;
+  /** The matched rows, for desaturation rendering; the same set on every call */
+  getMatchedRows(): RowSet;
 }

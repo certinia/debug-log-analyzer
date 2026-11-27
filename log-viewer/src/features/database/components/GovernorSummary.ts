@@ -5,7 +5,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../components/governorCopy.js';
-import { sharePercent } from '../../../core/utility/Util.js';
+import { sharePercent } from '#core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 /** One at-a-glance governor gauge for the overview strip. */

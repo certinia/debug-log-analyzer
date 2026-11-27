@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
 import {
   type EventNode,
   NO_ROW,
@@ -23,7 +21,7 @@ export function navNode(
   depth: number,
   children?: NavNode[],
 ): NavNode {
-  const original = { id } as unknown as LogEvent;
+  const original: unknown = { id };
   return {
     data: { id, timestamp, duration, type: 'METHOD_ENTRY', text: id, original },
     children,
@@ -73,8 +71,9 @@ export function navFrames(roots: NavNode[]): TimelineFrames<EventNode> {
     depth,
     parent: Int32Array.from(parents),
     subtreeEnd: Int32Array.from(ends),
-    rectsByCategory: new Map(),
-    rectsByDepth: new Map(),
+    categoryId: new Uint8Array(nodes.length),
+    categoryNames: [],
+    rectRowsByDepth: [],
     isVisible: (row) => shown[row] ?? false,
     rowsAtDepth: (d) => Int32Array.from((byDepth[d] ?? []).sort((x, y) => start[x]! - start[y]!)),
     node: (row) => nodes[row]!,
@@ -84,6 +83,7 @@ export function navFrames(roots: NavNode[]): TimelineFrames<EventNode> {
       const row = byOriginal.get(original) ?? NO_ROW;
       return shown[row] ? row : NO_ROW;
     },
+    hasRect: () => false,
     rectOf: () => undefined,
   };
 }

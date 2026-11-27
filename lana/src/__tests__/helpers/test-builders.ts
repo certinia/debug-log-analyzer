@@ -6,7 +6,7 @@
  * Factory functions for building test data in lana tests.
  */
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import { parse, type ApexLog } from '@apexdevtools/apex-log-parser';
 
 import type { Context } from '../../Context.js';
 import {
@@ -15,59 +15,17 @@ import {
   type MockExtensionContext,
 } from '../mocks/vscode.js';
 
-/** Widen as `lana` reads more: a field absent here is `undefined` on the mock, not a type error. */
-type PartialLogEvent = Partial<
-  Pick<
-    LogEvent,
-    | 'children'
-    | 'dmlCount'
-    | 'dmlRowCount'
-    | 'duration'
-    | 'exitStamp'
-    | 'soqlCount'
-    | 'soqlRowCount'
-    | 'text'
-    | 'thrownCount'
-    | 'timestamp'
-    | 'type'
-  >
->;
+/** A log line stamped `ns` nanoseconds. */
+export const logLine = (ns: number, line: string): string => `09:18:22.6 (${ns})|${line}`;
 
-/**
- * Creates a mock LogEvent with sensible defaults.
- * All properties are optional - specify only what you need for the test.
- */
-export function createMockLogEvent(overrides: PartialLogEvent = {}): LogEvent {
-  const base = {
-    children: [],
-    type: 'METHOD_ENTRY',
-    text: 'Test Event',
-    timestamp: 1000000,
-    exitStamp: 2000000,
-    duration: { self: 1000000, total: 1000000 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-  } satisfies PartialLogEvent;
-
-  return { ...base, ...overrides } as LogEvent;
+/** `lines` parsed as one log, so a test reads the parser's real events. */
+export function parseLines(lines: readonly string[]): Promise<ApexLog> {
+  return parse(lines.join('\n'));
 }
 
-type PartialApexLog = Partial<Pick<ApexLog, 'children' | 'size'>>;
-
-/**
- * Creates a mock ApexLog with sensible defaults.
- * Useful for testing components that work with parsed log data.
- */
-export function createMockApexLog(overrides: PartialApexLog = {}): ApexLog {
-  const base = {
-    children: [],
-    size: 0,
-  } satisfies PartialApexLog;
-
-  return { ...base, ...overrides } as ApexLog;
+/** A stand-in log for a test that only needs one to exist. */
+export function createMockApexLog(): ApexLog {
+  return { size: 0 } as ApexLog;
 }
 
 /**

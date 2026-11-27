@@ -115,8 +115,8 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     announcementBar: {
-      id: 'lana-1_22_0', // Unique ID to prevent showing again if dismissed
-      content: `🎉️ <b><a href="/${projectName}/community/changelog">Apex Log Analyzer v1.22</a> is out!</b>`,
+      id: 'lana-1_24_0', // Unique ID to prevent showing again if dismissed
+      content: `🎉️ <b><a href="/${projectName}/community/changelog">Apex Log Analyzer v1.24</a> is out!</b>`,
       isCloseable: true,
       backgroundColor: 'var(--lana-surface)',
       textColor: 'var(--lana-ink)',

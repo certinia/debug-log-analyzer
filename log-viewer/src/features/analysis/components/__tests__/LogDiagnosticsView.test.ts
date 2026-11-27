@@ -23,17 +23,24 @@ let held: Promise<LogDiagnostics> | null = null;
 
 jest.mock('../../services/LogDiagnostics.js', () => ({
   logDiagnostics: () => held ?? Promise.resolve(result),
-  scopeDiagnostics: (_log: unknown, all: LogDiagnostics, instances: readonly number[]) => {
-    askedAbout = instances;
+  scopeDiagnostics: (_log: unknown, all: LogDiagnostics, eventIds: readonly number[]) => {
+    askedAbout = eventIds;
     return { ...all, diagnostics: all.diagnostics.filter((d) => keep(d.id)) };
   },
 }));
 
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import { describeLevelGap, findLevelGap, type LevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import '../LogDiagnosticsView.js';
 
+let gap: LevelGap | null = null;
+
 const loadLog = (element: HTMLElementTagNameMap['log-diagnostics']) => {
-  element.logStore = { log: {}, derive: async (fn: () => unknown) => fn() } as unknown as LogStore;
+  element.logStore = {
+    log: {},
+    derive: async (fn: () => unknown) => fn(),
+    levelGap: () => gap,
+  } as unknown as LogStore;
 };
 
 // The findings land a task after the render that asks for them.
@@ -44,10 +51,10 @@ const settle = async (element: HTMLElementTagNameMap['log-diagnostics']) => {
   }
 };
 
-const view = async (scope?: { instances: number[] }) => {
+const view = async (scope?: { eventIds: number[] }) => {
   const element = document.createElement('log-diagnostics');
   if (scope) {
-    element.instances = scope.instances;
+    element.eventIds = scope.eventIds;
   }
   loadLog(element);
   document.body.append(element);
@@ -83,6 +90,7 @@ describe('log-diagnostics', () => {
     keep = () => true;
     askedAbout = [];
     held = null;
+    gap = null;
   });
 
   it('says nothing is wrong, rather than showing an empty list', async () => {
@@ -98,7 +106,7 @@ describe('log-diagnostics', () => {
         summary: 'Not selective.',
         message: 'why',
         count: 3,
-        eventIndex: 1,
+        eventId: 1,
       },
       {
         id: 'b',
@@ -106,7 +114,7 @@ describe('log-diagnostics', () => {
         summary: '50 debug statements ran.',
         message: 'why',
         count: 1,
-        eventIndex: 2,
+        eventId: 2,
       },
     ];
     const element = await view();
@@ -127,8 +135,8 @@ describe('log-diagnostics', () => {
         summary: 'System.LimitException: Apex CPU time limit exceeded',
         message: 'why',
         count: 2,
-        eventIndex: 1,
-        evidence: [{ text: 'Class.A.run: line 31, column 1', eventIndex: 1 }],
+        eventId: 1,
+        evidence: [{ text: 'Class.A.run: line 31, column 1', eventId: 1 }],
       },
     ];
     const element = await view();
@@ -149,10 +157,10 @@ describe('log-diagnostics', () => {
         summary: '23 Contact queries, one row at a time.',
         message: 'why',
         count: 23,
-        eventIndex: 4,
+        eventId: 4,
         evidence: [
-          { text: "SELECT Id FROM Contact WHERE Id = '003a'", eventIndex: 4 },
-          { text: "SELECT Id FROM Contact WHERE Id = '003b'", eventIndex: 9 },
+          { text: "SELECT Id FROM Contact WHERE Id = '003a'", eventId: 4 },
+          { text: "SELECT Id FROM Contact WHERE Id = '003b'", eventId: 9 },
         ],
       },
     ];
@@ -160,7 +168,7 @@ describe('log-diagnostics', () => {
     await openAll(element);
     const seen: number[] = [];
     element.addEventListener('inspector-reveal', (e) => {
-      seen.push((e as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+      seen.push((e as CustomEvent<{ eventId: number }>).detail.eventId);
     });
 
     // Each statement is its own way back into the grid.
@@ -180,10 +188,10 @@ describe('log-diagnostics', () => {
         summary: '23 Contact queries, one row at a time.',
         message: 'why',
         count: 23,
-        eventIndex: 4,
+        eventId: 4,
         evidence: [
-          { text: "SELECT Id FROM Contact WHERE Id = '003a'", eventIndex: 4, count: 3 },
-          { text: "SELECT Id FROM Contact WHERE Id = '003b'", eventIndex: 9, count: 1 },
+          { text: "SELECT Id FROM Contact WHERE Id = '003a'", eventId: 4, count: 3 },
+          { text: "SELECT Id FROM Contact WHERE Id = '003b'", eventId: 9, count: 1 },
         ],
       },
     ];
@@ -203,7 +211,7 @@ describe('log-diagnostics', () => {
         summary: 'CPU limit exceeded.',
         message: 'The governor stopped the transaction here.',
         count: 1,
-        eventIndex: 1,
+        eventId: 1,
         cause: { label: 'Most time in', name: 'Slow.run()', value: '11.3 s (46%)' },
       },
     ];
@@ -223,15 +231,15 @@ describe('log-diagnostics', () => {
         summary: 'SOQL is unbounded.',
         message: 'why',
         count: 1,
-        eventIndex: 7,
-        evidence: [{ text: 'SELECT Id FROM Account', eventIndex: 7 }],
+        eventId: 7,
+        evidence: [{ text: 'SELECT Id FROM Account', eventId: 7 }],
       },
     ];
     const element = await view();
     await openAll(element);
     const seen: number[] = [];
     element.addEventListener('inspector-reveal', (e) => {
-      seen.push((e as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+      seen.push((e as CustomEvent<{ eventId: number }>).detail.eventId);
     });
 
     element.shadowRoot!.querySelector<HTMLButtonElement>('.evidence--link')?.click();
@@ -247,8 +255,8 @@ describe('log-diagnostics', () => {
         summary: '50 debug statements ran.',
         message: 'why',
         count: 1,
-        eventIndex: -1,
-        evidence: [{ text: 'System.debug', eventIndex: -1 }],
+        eventId: -1,
+        evidence: [{ text: 'System.debug', eventId: -1 }],
       },
     ];
     const element = await view();
@@ -266,7 +274,7 @@ describe('log-diagnostics', () => {
         summary: 'A long finding.',
         message: 'why',
         count: 1,
-        eventIndex: 1,
+        eventId: 1,
       },
     ];
     const element = await view();
@@ -278,7 +286,14 @@ describe('log-diagnostics', () => {
   it('reports absent query plans rather than leaving the queries looking clean', async () => {
     result.queryPlansKnown = false;
     const element = await view();
-    expect(text(element, '.note').join(' ')).toContain('Database log level at FINEST');
+    expect(text(element, '.note').join(' ')).toContain('The log has no query plans.');
+  });
+
+  it('names the level a log was captured below when it has no query plans', async () => {
+    result.queryPlansKnown = false;
+    gap = findLevelGap('queryPlans', { database: 'FINE' }, { database: 'FINE' });
+    const element = await view();
+    expect(text(element, '.note')).toContain(describeLevelGap(gap));
   });
 
   it('reports how much of the log the SOQL rules covered when they were capped', async () => {
@@ -296,7 +311,7 @@ describe('log-diagnostics', () => {
         summary: 'Later finding.',
         message: 'why',
         count: 1,
-        eventIndex: 1,
+        eventId: 1,
       },
     ];
     loadLog(element);
@@ -306,14 +321,14 @@ describe('log-diagnostics', () => {
 
   it('times a finding the log times, and leaves the rest without a figure', async () => {
     result.diagnostics = [
-      { id: 'a', severity: 'Warning', summary: 'Untimed.', message: '', count: 1, eventIndex: 1 },
+      { id: 'a', severity: 'Warning', summary: 'Untimed.', message: '', count: 1, eventId: 1 },
       {
         id: 'b',
         severity: 'Warning',
         summary: 'Timed.',
         message: '',
         count: 1,
-        eventIndex: 2,
+        eventId: 2,
         timeNs: 250_000_000,
       },
     ];
@@ -329,7 +344,7 @@ describe('log-diagnostics', () => {
         summary: 'Barely there.',
         message: '',
         count: 1,
-        eventIndex: 1,
+        eventId: 1,
         timeNs: 1_000_000,
       },
     ];
@@ -339,9 +354,9 @@ describe('log-diagnostics', () => {
 
   it('holds the list to any set of severities the roll-up has pressed', async () => {
     result.diagnostics = [
-      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventIndex: 1 },
-      { id: 'b', severity: 'Warning', summary: 'Slow.', message: '', count: 1, eventIndex: 2 },
-      { id: 'c', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventIndex: 3 },
+      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventId: 1 },
+      { id: 'b', severity: 'Warning', summary: 'Slow.', message: '', count: 1, eventId: 2 },
+      { id: 'c', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventId: 3 },
     ];
     const element = await view();
     const bands = () => [
@@ -377,9 +392,9 @@ describe('log-diagnostics', () => {
         summary: 'Log truncated.',
         message: '',
         count: 1,
-        eventIndex: 1,
+        eventId: 1,
       },
-      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventIndex: 2 },
+      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventId: 2 },
     ];
     const element = await view();
 
@@ -392,8 +407,8 @@ describe('log-diagnostics', () => {
 
   it('releases a held severity when a new log brings new findings', async () => {
     result.diagnostics = [
-      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventIndex: 1 },
-      { id: 'b', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventIndex: 2 },
+      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventId: 1 },
+      { id: 'b', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventId: 2 },
     ];
     const element = await view();
     element.shadowRoot!.querySelector<HTMLButtonElement>('.rollup__seg')!.click();
@@ -410,7 +425,7 @@ describe('log-diagnostics', () => {
 
   it("drops the last log's findings as soon as a new log arrives", async () => {
     result.diagnostics = [
-      { id: 'a', severity: 'Warning', summary: 'Old.', message: '', count: 1, eventIndex: 1 },
+      { id: 'a', severity: 'Warning', summary: 'Old.', message: '', count: 1, eventId: 1 },
     ];
     const element = await view();
     held = new Promise(() => {});
@@ -433,7 +448,7 @@ describe('log-diagnostics', () => {
       summary,
       message: '',
       count: 1,
-      eventIndex: 1,
+      eventId: 1,
     });
     result = { ...result, diagnostics: [finding('Current.')] };
     loadLog(element);
@@ -454,7 +469,7 @@ describe('log-diagnostics', () => {
         summary: 'Full table scan.',
         message: 'Account',
         count: 1,
-        eventIndex: 1,
+        eventId: 1,
       },
       {
         id: 'plan-scan|Contact',
@@ -462,7 +477,7 @@ describe('log-diagnostics', () => {
         summary: 'Full table scan.',
         message: 'Contact',
         count: 1,
-        eventIndex: 2,
+        eventId: 2,
       },
     ];
     const element = await view();
@@ -476,7 +491,7 @@ describe('log-diagnostics', () => {
 
   it('leaves the roll-up out when one severity is the whole list', async () => {
     result.diagnostics = [
-      { id: 'a', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventIndex: 1 },
+      { id: 'a', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventId: 1 },
     ];
     const element = await view();
     expect(element.shadowRoot!.querySelector('.rollup')).toBeNull();
@@ -484,11 +499,11 @@ describe('log-diagnostics', () => {
 
   it('scopes the findings to the selection', async () => {
     result.diagnostics = [
-      { id: 'a', severity: 'Error', summary: 'Mine.', message: '', count: 1, eventIndex: 1 },
-      { id: 'b', severity: 'Error', summary: 'Elsewhere.', message: '', count: 1, eventIndex: 9 },
+      { id: 'a', severity: 'Error', summary: 'Mine.', message: '', count: 1, eventId: 1 },
+      { id: 'b', severity: 'Error', summary: 'Elsewhere.', message: '', count: 1, eventId: 9 },
     ];
     keep = (id) => id === 'a';
-    const element = await view({ instances: [1, 4] });
+    const element = await view({ eventIds: [1, 4] });
 
     expect(askedAbout).toEqual([1, 4]);
     expect(text(element, '.title')).toEqual(['Mine.']);
@@ -498,16 +513,16 @@ describe('log-diagnostics', () => {
 
   it('says nothing is wrong for a selection the findings pass over', async () => {
     result.diagnostics = [
-      { id: 'a', severity: 'Error', summary: 'Elsewhere.', message: '', count: 1, eventIndex: 9 },
+      { id: 'a', severity: 'Error', summary: 'Elsewhere.', message: '', count: 1, eventId: 9 },
     ];
     keep = () => false;
-    const element = await view({ instances: [1] });
+    const element = await view({ eventIds: [1] });
     expect(text(element, '.ok')).toEqual(["No findings — you're good to go."]);
   });
 
   it('keeps a whole-log caveat out of the scoped list, which it does not describe', async () => {
     result.queryPlansKnown = false;
-    const element = await view({ instances: [1] });
-    expect(text(element, '.note').join(' ')).not.toContain('Database log level at FINEST');
+    const element = await view({ eventIds: [1] });
+    expect(text(element, '.note').join(' ')).not.toContain('The log has no query plans.');
   });
 });

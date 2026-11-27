@@ -34,13 +34,28 @@ export interface Config {
   // The app-wide inspector, fed by a selection on any tab.
   inspector: {
     position: 'left' | 'right' | 'bottom';
-    size: number;
     // The rest is private globalState (see INSPECTOR_STATE_SECTIONS), not settings.
+    sideSize: number | null;
+    bottomSize: number | null;
     collapsed: Record<string, boolean>;
     sectionOrder: Record<string, string[]>;
     hiddenSections: Record<string, boolean>;
     visible: boolean | null;
   };
+  /** The VS Code look the webview's chrome follows. Read from `workbench`, not `lana`. */
+  ui: { mode: 'modern' | 'classic' };
+}
+
+/** The `workbench` settings behind `Config.ui`; a change to one is pushed to the webview. */
+export const UI_SETTINGS = ['workbench.experimental.modernUI'] as const;
+
+function getUi(): Config['ui'] {
+  const workbench = workspace.getConfiguration('workbench');
+  // A VS Code older than Modern UI has no such setting, and only the classic look.
+  const registered =
+    workbench.inspect<boolean>('experimental.modernUI')?.defaultValue !== undefined;
+  const modern = registered && workbench.get<boolean>('experimental.modernUI', true);
+  return { mode: modern ? 'modern' : 'classic' };
 }
 
 export function getConfig(): Config {
@@ -68,6 +83,7 @@ export function getConfig(): Config {
       { columnView: 'General', columnOverrides: {}, ...database[view] },
     ]),
   );
+  plainConfig.ui = getUi();
   return plainConfig;
 }
 
@@ -123,13 +139,15 @@ export const COLUMN_VIEW_SECTIONS = [
 ] as const;
 
 /**
- * The inspector's layout state (which sections are collapsed, which it hides,
- * the order they are in, whether the panel is open) is remembered UI state
- * rather than a preference, so it persists in globalState. Dock position and
- * size stay public `lana.inspector.*` settings. Section sizes are remembered
- * nowhere: a section takes the space its content and the panel allow.
+ * The inspector's layout state (its size, which sections are collapsed, which it
+ * hides, the order they are in, whether the panel is open) is remembered UI state
+ * rather than a preference, so it persists in globalState. Dock position stays a
+ * public `lana.inspector.*` setting. Section sizes are remembered nowhere: a
+ * section takes the space its content and the panel allow.
  */
 export const INSPECTOR_STATE_SECTIONS = [
+  'inspector.sideSize',
+  'inspector.bottomSize',
   'inspector.collapsed',
   'inspector.sectionOrder',
   'inspector.hiddenSections',
@@ -146,11 +164,13 @@ export const PRIVATE_SECTIONS = [
 type ColumnOverrides = Record<string, string[]>;
 type InspectorState = Pick<
   Config['inspector'],
-  'collapsed' | 'sectionOrder' | 'hiddenSections' | 'visible'
+  'sideSize' | 'bottomSize' | 'collapsed' | 'sectionOrder' | 'hiddenSections' | 'visible'
 >;
 
 export function getInspectorState(globalState: Memento): InspectorState {
   return {
+    sideSize: globalState.get<number | null>('inspector.sideSize', null),
+    bottomSize: globalState.get<number | null>('inspector.bottomSize', null),
     collapsed: globalState.get<Record<string, boolean>>('inspector.collapsed', {}),
     sectionOrder: globalState.get<Record<string, string[]>>('inspector.sectionOrder', {}),
     hiddenSections: globalState.get<Record<string, boolean>>('inspector.hiddenSections', {}),

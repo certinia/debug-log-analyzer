@@ -3,11 +3,9 @@
  */
 import { customElement } from 'lit/decorators.js';
 
-import type { SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import type { SoslEvent } from '#core/log/statements.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOSL_VIEWS } from '../../../components/grid/ColumnViews.js';
-import { NAMESPACE_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { textColumn } from '../../../components/grid/columns.js';
 import {
   rowCountColumn,
@@ -28,13 +26,11 @@ function soslColumns(rows: readonly SOSLRow[]): GridColumn<SOSLRow>[] {
       id: 'namespace',
       title: 'Namespace',
       value: (row) => row.namespace,
-      width: NAMESPACE_WIDTH,
     }),
     textColumn({
       id: 'callerNamespace',
       title: 'Caller Namespace',
       value: (row) => row.callerNamespace,
-      width: NAMESPACE_WIDTH,
       hidden: true,
     }),
     rowCountColumn(rows),
@@ -43,7 +39,7 @@ function soslColumns(rows: readonly SOSLRow[]): GridColumn<SOSLRow>[] {
 }
 
 @customElement('sosl-view')
-export class SOSLView extends StatementGrid<SOSLRow, SOSLExecuteBeginLine> {
+export class SOSLView extends StatementGrid<SOSLRow, SoslEvent> {
   constructor() {
     super({
       type: 'sosl',
@@ -60,13 +56,13 @@ export class SOSLView extends StatementGrid<SOSLRow, SOSLExecuteBeginLine> {
     });
   }
 
-  protected toRows(lines: readonly SOSLExecuteBeginLine[]): SOSLRow[] {
+  protected toRows(lines: readonly SoslEvent[], callerOf: (id: number) => string): SOSLRow[] {
     return lines.map((sosl) => ({
-      eventIndex: sosl.eventIndex,
-      sosl: sosl.text,
+      eventId: sosl.id,
+      sosl: sosl.text ?? '',
       namespace: sosl.namespace,
-      callerNamespace: getCallerNamespace(sosl),
-      rowCount: sosl.soslRowCount.self,
+      callerNamespace: callerOf(sosl.id),
+      rowCount: sosl.soslRowCount?.self ?? 0,
       timeTaken: sosl.duration.total,
     }));
   }

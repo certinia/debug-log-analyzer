@@ -33,18 +33,11 @@ import type {
   TimelineFrames,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  MatchedEventInfo,
-  SearchCursor,
-  SearchOptions,
-} from '../../types/search.types.js';
+import type { FramePredicate, MatchSpan, RowSet, SearchCursor } from '../../types/search.types.js';
 import { createHighlightColors } from '../rendering/HighlightRenderer.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
-import { FlameChartCursor } from '../search/FlameChartCursor.js';
 import { MeshSearchStyleRenderer } from '../search/MeshSearchStyleRenderer.js';
-import type { SearchCursorImpl } from '../search/SearchCursor.js';
 import { SearchHighlightRenderer } from '../search/SearchHighlightRenderer.js';
 import { SearchTextLabelRenderer } from '../search/SearchTextLabelRenderer.js';
 import type { TextLabelRenderer } from '../TextLabelRenderer.js';
@@ -297,14 +290,12 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
   }
 
   /**
-   * Search events using predicate function.
-   * Returns FlameChartCursor that automatically handles centering, tooltips, and rendering.
+   * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
-   * @returns FlameChartCursor for navigating results, or null if search not initialized
+   * @returns The number of matches, or null if search not initialized or a newer search stopped it
    */
-  public search(predicate: FramePredicate, options?: SearchOptions): SearchCursor<E> | null {
+  public async search(predicate: FramePredicate): Promise<number | null> {
     if (!this.eventMatcher) {
       return null;
     }
@@ -315,20 +306,49 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     // Clear selection when starting a new search to show search highlights
     this.callbacks.onClearSelection();
 
-    const innerCursor = this.eventMatcher.search(predicate, options);
+    const cursor = await this.eventMatcher.search(predicate);
+    if (!cursor) {
+      return null;
+    }
 
     // Request render to update display with new search state
     // (especially important when search returns 0 results to clear old highlights)
     this.callbacks.requestRender();
 
-    // Wrap with FlameChartCursor to add automatic side effects
-    return new FlameChartCursor(innerCursor, (match) => {
-      // Restore cursor if it was cleared (e.g., by Escape key)
-      if (!this.eventMatcher?.getCursor()) {
-        this.eventMatcher?.setCursor(innerCursor as SearchCursorImpl<E>);
-      }
-      this.handleSearchNavigation(match);
-    });
+    return cursor.total;
+  }
+
+  /**
+   * Make match `index` (from 0) current: centre on it and show its panel. -1 makes none current.
+   */
+  public setCurrentMatch(index: number): void {
+    const match = this.eventMatcher?.getCursor()?.seek(index);
+    if (!match) {
+      this.callbacks.requestRender();
+      return;
+    }
+    if (!this.viewport) {
+      return;
+    }
+
+    // Clear selection so search highlight shows
+    this.callbacks.onClearSelection();
+
+    // Center viewport on the match
+    this.callbacks.onCenterOnMatch(match.event.timestamp, match.event.duration, match.depth);
+
+    // Calculate screen coordinates for tooltip positioning
+    const screenX = this.viewport.calculateVisibleCenterX(
+      match.event.timestamp,
+      match.event.duration,
+    );
+    const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
+
+    // Notify callback for tooltip
+    this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
+
+    // Request render to show updated highlight
+    this.callbacks.requestRender();
   }
 
   /**
@@ -355,33 +375,33 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    this.renderDimmedExcept(context, cursor.getMatchedEventIds(), cursor.getMatchedEventsInfo());
+    this.renderDimmedExcept(context, cursor.getMatchedRows(), cursor.matches);
   }
 
   /**
-   * Draw the frames in `eventIds` at full colour and dim everything else — the
+   * Draw the frames in `rows` at full colour and dim everything else — the
    * two-tier styling search uses, driven by an explicit set so the inspector's
    * hover emphasis can share it.
    *
    * @param context - Render context with viewport state, visible rects, and buckets
-   * @param eventIds - Rect ids to keep at full colour
-   * @param eventsInfo - The same frames' time/depth/category, so a frame merged
+   * @param rows - Rows to keep at full colour
+   * @param spans - Where the same frames sit, so a frame merged
    *   into a pixel bucket still lights
    * @param litCategories - Categories kept at full colour whole (the legend highlight)
    */
   public renderDimmedExcept(
     context: SearchRenderContext,
-    eventIds: ReadonlySet<string>,
-    eventsInfo: ReadonlyArray<MatchedEventInfo>,
+    rows: RowSet,
+    spans: ReadonlyArray<MatchSpan>,
     litCategories?: ReadonlySet<string>,
   ): void {
     this.ensureRenderersInitialized();
     this.searchStyleRenderer?.render(
       context.visibleRects,
-      eventIds,
+      rows,
       context.buckets,
       context.viewportState,
-      eventsInfo,
+      spans,
       litCategories,
     );
   }
@@ -409,26 +429,26 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    this.renderLabelsDimmedExcept(context, cursor.getMatchedEventIds());
+    this.renderLabelsDimmedExcept(context, cursor.getMatchedRows());
   }
 
   /**
-   * Label counterpart of {@link renderDimmedExcept}: the labels of `eventIds`
+   * Label counterpart of {@link renderDimmedExcept}: the labels of `rows`
    * stay legible and the rest are dimmed.
    *
    * @param context - Render context with viewport state and visible rects
-   * @param eventIds - Rect ids to keep at full strength
+   * @param rows - Rows to keep at full strength
    * @param litCategories - Categories kept at full strength whole
    */
   public renderLabelsDimmedExcept(
     context: SearchRenderContext,
-    eventIds: ReadonlySet<string>,
+    rows: RowSet,
     litCategories?: ReadonlySet<string>,
   ): void {
     this.ensureRenderersInitialized();
     this.searchTextLabelRenderer?.render(
       context.visibleRects,
-      eventIds,
+      rows,
       context.viewportState,
       litCategories,
     );
@@ -475,41 +495,5 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    */
   public clearHighlight(): void {
     this.searchHighlightRenderer?.clear();
-  }
-
-  // ============================================================================
-  // PRIVATE - NAVIGATION
-  // ============================================================================
-
-  /**
-   * Handle search navigation side effects:
-   * - Clear selection so search highlight shows
-   * - Center viewport on match
-   * - Call onSearchNavigate callback for application-specific logic (e.g., tooltips)
-   * - Request render
-   */
-  private handleSearchNavigation(match: { event: E; depth: number }): void {
-    if (!this.viewport) {
-      return;
-    }
-
-    // Clear selection so search highlight shows
-    this.callbacks.onClearSelection();
-
-    // Center viewport on the match
-    this.callbacks.onCenterOnMatch(match.event.timestamp, match.event.duration, match.depth);
-
-    // Calculate screen coordinates for tooltip positioning
-    const screenX = this.viewport.calculateVisibleCenterX(
-      match.event.timestamp,
-      match.event.duration,
-    );
-    const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
-
-    // Notify callback for tooltip
-    this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
-
-    // Request render to show updated highlight
-    this.callbacks.requestRender();
   }
 }

@@ -126,3 +126,52 @@ describe('GridStore.find', () => {
     expect((await newer)?.total).toBe(2000);
   });
 });
+
+describe('FindResult.firstMatchFrom', () => {
+  /** The first match at or after each shown row, by the row's key, then past the end. */
+  async function fromEachRow(
+    store: GridStore<Node>,
+    text: string,
+    cells: ((r: Node) => string)[],
+  ): Promise<(string | number)[]> {
+    const result = await store.find({ text }, cells);
+    const { rows } = store.snapshot();
+    return Array.from({ length: rows.size + 1 }, (_, i) =>
+      i < rows.size
+        ? `${rows.keyAt(i)}:${result?.firstMatchFrom(rows, i)}`
+        : (result?.firstMatchFrom(rows, i) ?? -1),
+    );
+  }
+
+  it('gives the first match on or below each shown row, and the total past the end', async () => {
+    const store = new GridStore(source(tree()));
+    await store.expandAll();
+
+    // Matches: a 0, c 1, d 2, e 3 and 4.
+    expect(await fromEachRow(store, 'account', [name])).toEqual([
+      'a:0',
+      'b:1',
+      'c:1',
+      'x:2',
+      'd:2',
+      'e:3',
+      5,
+    ]);
+  });
+
+  it('counts a match in a collapsed row at the shown row above it', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+
+    // Only b's note matches, and b is hidden under a.
+    expect(await fromEachRow(store, 'account', [note])).toEqual(['a:0', 'd:1', 1]);
+  });
+
+  it('counts a match in a collapsed group at its group row', async () => {
+    const store = new GridStore(source(tree()), { groupBy: (r) => r.kind });
+    await store.collapseAll();
+
+    // The soql group holds d and e, hidden; apex holds a and c.
+    expect(await fromEachRow(store, 'account', [name])).toEqual(['apex:0', 'soql:2', 5]);
+  });
+});

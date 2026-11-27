@@ -1,48 +1,42 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  DMLBeginLine,
-  LOG_CATEGORY,
-  SOQLExecuteBeginLine,
-  SOSLExecuteBeginLine,
-} from '@apexdevtools/apex-log-parser';
+import { type EventOf, eventType } from '@apexdevtools/apex-log-parser';
 
 import type { Derivation } from './LogStore.js';
 
+export type SoqlEvent = EventOf<'SOQL_EXECUTE_BEGIN'>;
+export type DmlEvent = EventOf<'DML_BEGIN'>;
+export type SoslEvent = EventOf<'SOSL_EXECUTE_BEGIN'>;
+
 /** The log's database statements, each kind in log order. */
 export interface Statements {
-  soql: SOQLExecuteBeginLine[];
-  dml: DMLBeginLine[];
-  sosl: SOSLExecuteBeginLine[];
+  soql: SoqlEvent[];
+  dml: DmlEvent[];
+  sosl: SoslEvent[];
   /** Every statement's index row, in log order. */
   rows: readonly number[];
 }
 
-/**
- * {@link Statements} for the log. A statement is always in the SOQL or DML
- * category, so only the rows in those two are read as events.
- */
+const SOQL = eventType('SOQL_EXECUTE_BEGIN').typeId;
+const DML = eventType('DML_BEGIN').typeId;
+const SOSL = eventType('SOSL_EXECUTE_BEGIN').typeId;
+
+/** {@link Statements} for the log, found by type id: only a statement is read as an event. */
 export const statements: Derivation<Statements> = (index) => {
-  const soql: SOQLExecuteBeginLine[] = [];
-  const dml: DMLBeginLine[] = [];
-  const sosl: SOSLExecuteBeginLine[] = [];
+  const soql: SoqlEvent[] = [];
+  const dml: DmlEvent[] = [];
+  const sosl: SoslEvent[] = [];
   const rows: number[] = [];
-  const soqlId = index.categoryNames.indexOf(LOG_CATEGORY.SOQL);
-  const dmlId = index.categoryNames.indexOf(LOG_CATEGORY.DML);
-  const { categoryId, rowCount } = index;
-  for (let row = 0; row < rowCount; row++) {
-    const category = categoryId[row];
-    if (category !== soqlId && category !== dmlId) {
-      continue;
-    }
-    const event = index.event(row);
-    if (event instanceof SOQLExecuteBeginLine) {
-      soql.push(event);
-    } else if (event instanceof DMLBeginLine) {
-      dml.push(event);
-    } else if (event instanceof SOSLExecuteBeginLine) {
-      sosl.push(event);
+  const type = index.column(index.log.columns.type);
+  for (let row = 0; row < index.rowCount; row++) {
+    const typeId = type[row];
+    if (typeId === SOQL) {
+      soql.push(index.event(row) as SoqlEvent);
+    } else if (typeId === DML) {
+      dml.push(index.event(row) as DmlEvent);
+    } else if (typeId === SOSL) {
+      sosl.push(index.event(row) as SoslEvent);
     } else {
       continue;
     }

@@ -4,15 +4,10 @@
 import { describe, expect, it } from '@jest/globals';
 import { parse } from '@apexdevtools/apex-log-parser';
 
-import { indexesOf } from '#test-helpers/apexLog.js';
-import { LogStore } from '../../../../core/log/LogStore.js';
+import { idsOf } from '#test-helpers/apexLog.js';
+import { LogStore } from '#core/log/LogStore.js';
 
-import {
-  concentration,
-  databaseOverview,
-  dmlOperation,
-  UNKNOWN_OBJECT,
-} from '../databaseOverview.js';
+import { concentration, databaseOverview, UNKNOWN_OBJECT } from '../databaseOverview.js';
 
 const HEAD =
   '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
@@ -33,18 +28,8 @@ const sosl = (start: number, end: number, rows: number, line = 3) =>
   `09:18:22.6 (${start})|SOSL_EXECUTE_BEGIN|[${line}]|FIND :term RETURNING Account(Id)\n` +
   `09:18:22.6 (${end})|SOSL_EXECUTE_END|[${line}]|Rows:${rows}\n`;
 
-const overviewOf = (body: string) =>
-  new LogStore(parse(HEAD + body + TAIL)).derive(databaseOverview);
-
-describe('dmlOperation', () => {
-  it('reads the operation out of a DML line', () => {
-    expect(dmlOperation('DML Op:Insert Type:Account')).toEqual('Insert');
-  });
-
-  it('falls back to DML when the line names no operation', () => {
-    expect(dmlOperation('DML')).toEqual('DML');
-  });
-});
+const overviewOf = async (body: string) =>
+  new LogStore(await parse(HEAD + body + TAIL)).derive(databaseOverview);
 
 describe('databaseOverview time', () => {
   it('splits database time by statement kind and shares it against the log', async () => {
@@ -59,8 +44,6 @@ describe('databaseOverview time', () => {
     expect(overview.time.sosl).toEqual({ timeNs: 10_000_000, statements: 1 });
     expect(overview.time.timeNs).toEqual(40_000_000);
     expect(overview.time.percentOfLog).toBeCloseTo(4.0, 1);
-    // The log's own duration is the spine's denominator, so it travels with the figures.
-    expect(overview.time.logNs).toBeGreaterThan(overview.time.timeNs);
   });
 
   it('reports zeroes for a log with no statements', async () => {
@@ -86,8 +69,8 @@ describe('databaseOverview statements', () => {
 
     expect(overview.ranked).toEqual([
       {
-        eventIndex: expect.any(Number),
-        eventIndexes: [expect.any(Number)],
+        eventId: expect.any(Number),
+        eventIds: [expect.any(Number)],
         kind: 'SOQL',
         label: 'SELECT Name FROM Contact',
         sObject: 'Contact',
@@ -99,8 +82,8 @@ describe('databaseOverview statements', () => {
         repeats: 1,
       },
       {
-        eventIndex: expect.any(Number),
-        eventIndexes: [expect.any(Number)],
+        eventId: expect.any(Number),
+        eventIds: [expect.any(Number)],
         kind: 'DML',
         label: 'Insert Case',
         sObject: 'Case',
@@ -112,8 +95,8 @@ describe('databaseOverview statements', () => {
         repeats: 1,
       },
       {
-        eventIndex: expect.any(Number),
-        eventIndexes: [expect.any(Number)],
+        eventId: expect.any(Number),
+        eventIds: [expect.any(Number)],
         kind: 'SOQL',
         label: 'SELECT Id FROM Account',
         sObject: 'Account',
@@ -145,21 +128,21 @@ describe('databaseOverview statements', () => {
     expect(overview.ranked[0]).toMatchObject({
       rows: 5,
       maxRows: 3,
-      eventIndexes: [expect.any(Number), expect.any(Number)],
+      eventIds: [expect.any(Number), expect.any(Number)],
     });
   });
 
   it('reveals the last of equally slow occurrences, as the tree walk met them', async () => {
-    const log = parse(
+    const log = await parse(
       HEAD +
         soql(10_000_000, 12_000_000, 1, 'SELECT Id FROM Account') +
         soql(13_000_000, 15_000_000, 1, 'SELECT Id FROM Account', 4) +
         TAIL,
     );
-    const [first, last] = indexesOf(log, 'SELECT Id FROM Account');
+    const [first, last] = idsOf(log, 'SELECT Id FROM Account');
     const overview = await new LogStore(log).derive(databaseOverview);
 
-    expect(overview.ranked[0]).toMatchObject({ eventIndex: last, eventIndexes: [last, first] });
+    expect(overview.ranked[0]).toMatchObject({ eventId: last, eventIds: [last, first] });
   });
 
   it('names the SObject each statement touched, and none for a search', async () => {
@@ -176,10 +159,10 @@ describe('databaseOverview statements', () => {
     ]);
   });
 
-  it('gives every statement its own event index, so a row can be revealed', async () => {
-    const indexes = (await overviewOf(body)).ranked.map((statement) => statement.eventIndex);
+  it('gives every statement its own event id, so a row can be revealed', async () => {
+    const ids = (await overviewOf(body)).ranked.map((statement) => statement.eventId);
 
-    expect(new Set(indexes).size).toEqual(indexes.length);
+    expect(new Set(ids).size).toEqual(ids.length);
   });
 
   it('labels DML the log gives no SObject for', async () => {
@@ -235,7 +218,7 @@ describe('databaseOverview tree', () => {
     const frame = overview.tree[0]?.children[0];
     expect(frame).toMatchObject({ label: 'Svc.load()', count: 2, timeNs: 19_600_000 });
     expect(frame?.children[0]).toMatchObject({ kind: 'SOQL', count: 2 });
-    expect(frame?.children[0]?.eventIndexes).toHaveLength(2);
+    expect(frame?.children[0]?.eventIds).toHaveLength(2);
   });
 
   it('sorts each level longest first', async () => {

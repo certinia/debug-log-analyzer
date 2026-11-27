@@ -18,6 +18,7 @@ import {
   HAS_CHILDREN,
   pack,
   spliceRows,
+  stepDepth,
   type Flat,
   type FlatRows,
   type RowView,
@@ -92,12 +93,6 @@ interface Built<R extends object> {
   toggled?: RowTarget<R>;
 }
 
-function flip<K>(set: Set<K>, key: K): void {
-  if (!set.delete(key)) {
-    set.add(key);
-  }
-}
-
 /**
  * Runs `work` to its end, checking the clock every {@link CHECK_EVERY} yields. Null once
  * `tick` reports the step stale, so the caches the work writes stay true.
@@ -129,9 +124,11 @@ export class GridStore<R extends object> {
   private source: TreeSource<R>;
   private readonly key = (row: R): RowKey => this.source.key(row);
   private readonly scheduler: Scheduler;
-  private expandBase: ExpandPolicy<R>;
-  /** Rows whose expansion differs from `expandBase`. */
-  private toggled = new Set<RowKey>();
+  private readonly expandBase: ExpandPolicy<R>;
+  /** A row or group above this depth is open; null follows `expandBase`, with groups closed. */
+  private level: number | null = null;
+  /** Rows opened or closed by hand, which wins over the level. */
+  private readonly hand = new Map<RowKey, boolean>();
   private sort: Sort<R> | null = null;
   private filters: readonly RowFilter<R>[] = [];
   private ordered = new WeakMap<readonly R[], readonly R[]>();
@@ -139,7 +136,7 @@ export class GridStore<R extends object> {
   private calcs: Calcs<R>;
   private groupBy: GroupBy<R> | null;
   private groupSort: Sort<Group<R>> | null = null;
-  private openGroups = new Set<string>();
+  private readonly handGroups = new Map<string, boolean>();
   /** Footer totals per filter set and calc; only a new source drops them. */
   private footers = new Map<string, Held<R>>();
   private filterIds = new WeakMap<RowFilter<R>, number>();
@@ -189,8 +186,9 @@ export class GridStore<R extends object> {
 
   setSource(source: TreeSource<R>): Promise<void> {
     this.source = source;
-    this.toggled.clear();
-    this.openGroups.clear();
+    this.level = null;
+    this.hand.clear();
+    this.handGroups.clear();
     this.deepPass = new WeakMap();
     this.dropTotals();
     return this.reorder();
@@ -234,21 +232,32 @@ export class GridStore<R extends object> {
   setGroupBy(groupBy: GroupBy<R> | null): Promise<void> {
     this.groupBy = groupBy;
     this.generation++;
-    this.openGroups.clear();
+    this.level = null;
+    this.handGroups.clear();
     this.groupTotals.clear();
     return this.rebuild();
   }
 
+  /** Opens every row and every group. */
   expandAll(): Promise<void> {
-    this.expandBase = true;
-    this.toggled.clear();
+    this.setAll(true);
     return this.rebuild();
   }
 
+  /** Closes every row and every group. */
   collapseAll(): Promise<void> {
-    this.expandBase = false;
-    this.toggled.clear();
+    this.setAll(false);
     return this.rebuild();
+  }
+
+  /** Opens every closed row at the shallowest depth that has one. A group is depth 0. */
+  expandLevel(): Promise<void> {
+    return this.step(true);
+  }
+
+  /** Closes every open row at the deepest depth that has one. A group is depth 0. */
+  collapseLevel(): Promise<void> {
+    return this.step(false);
   }
 
   /**
@@ -257,7 +266,11 @@ export class GridStore<R extends object> {
    * {@link reveal} to reach it. Takes a data row's key, or a group. True when it opened the row.
    */
   async toggle(target: RowTarget<R>, expanded?: boolean): Promise<boolean> {
-    await this.settled();
+    // A loop, inline: waiters resume together, so the first one's change starts a build the
+    // rest must wait out, with no await between this check and the reads below.
+    while (this.running) {
+      await this.settled();
+    }
     const rows = this.current.rows;
     const index = rows.indexOf(target);
     if (index === -1 || !rows.hasChildrenAt(index)) {
@@ -267,11 +280,7 @@ export class GridStore<R extends object> {
     if (expanded === was) {
       return false;
     }
-    if (target instanceof Group) {
-      flip(this.openGroups, target.key);
-    } else {
-      flip(this.toggled, target);
-    }
+    this.setHand(target, !was);
     if (!this.splice(index, !was, target)) {
       this.toggledTarget = target;
       await this.rebuild();
@@ -286,7 +295,9 @@ export class GridStore<R extends object> {
    */
   async reveal(path: readonly RowKey[]): Promise<number> {
     // Sibling lists are cached as they are read, so read them only once filters are ready.
-    await this.settled();
+    while (this.running) {
+      await this.settled();
+    }
     const indent = this.groupBy ? 1 : 0;
     let list: readonly R[] = this.source.roots;
     let found: R | null = null;
@@ -299,12 +310,14 @@ export class GridStore<R extends object> {
       found = row;
       if (depth === 0 && this.groupBy) {
         const group = this.groupBy(row);
-        opened = !this.openGroups.has(group);
-        this.openGroups.add(group);
+        opened = !this.groupOpen(group);
+        if (opened) {
+          this.handGroups.set(group, true);
+        }
       }
       if (depth < path.length - 1) {
         if (!this.isExpanded(row, depth + indent)) {
-          flip(this.toggled, key);
+          this.hand.set(key, true);
           opened = true;
         }
         list = this.source.children?.(row) ?? [];
@@ -405,10 +418,73 @@ export class GridStore<R extends object> {
       .join(',');
   }
 
+  private setAll(expanded: boolean): void {
+    this.level = expanded ? Infinity : 0;
+    this.hand.clear();
+    this.handGroups.clear();
+  }
+
+  /**
+   * Moves the level one step, and drops the hand state of the rows it steps. A row on
+   * screen the new level would change keeps its state by hand, so only the stepped rows move.
+   */
+  private async step(expand: boolean): Promise<void> {
+    while (this.running) {
+      await this.settled();
+    }
+    const rows = this.current.rows;
+    const depth = stepDepth(rows, expand);
+    if (depth === -1) {
+      return;
+    }
+    const now = this.level;
+    const level = expand ? Math.max(now ?? 0, depth + 1) : Math.min(now ?? Infinity, depth);
+    for (let i = 0; i < rows.size; i++) {
+      if (!rows.hasChildrenAt(i)) {
+        continue;
+      }
+      const at = rows.depthAt(i);
+      const open = rows.isExpandedAt(i);
+      if (at === depth && open !== expand) {
+        this.setHand(rows.targetAt(i), undefined);
+      } else if (open !== at < level) {
+        const [hand, key] = this.handFor(rows.targetAt(i));
+        if (!hand.has(key)) {
+          hand.set(key, open);
+        }
+      }
+    }
+    this.level = level;
+    await this.rebuild();
+  }
+
+  private handFor(target: RowTarget<R>): [Map<RowKey, boolean>, RowKey] {
+    return target instanceof Group ? [this.handGroups, target.key] : [this.hand, target];
+  }
+
+  /** Opens or closes a row or group by hand; undefined hands it back to the level. */
+  private setHand(target: RowTarget<R>, open: boolean | undefined): void {
+    const [hand, key] = this.handFor(target);
+    if (open === undefined) {
+      hand.delete(key);
+    } else {
+      hand.set(key, open);
+    }
+  }
+
+  private groupOpen(key: string): boolean {
+    return this.handGroups.get(key) ?? (this.level ?? 0) > 0;
+  }
+
   private isExpanded(row: R, depth: number): boolean {
-    const base =
-      typeof this.expandBase === 'function' ? this.expandBase(row, depth) : this.expandBase;
-    return base !== this.toggled.has(this.key(row));
+    const open = this.hand.get(this.key(row));
+    if (open !== undefined) {
+      return open;
+    }
+    if (this.level !== null) {
+      return depth < this.level;
+    }
+    return typeof this.expandBase === 'function' ? this.expandBase(row, depth) : this.expandBase;
   }
 
   private passes(row: R): boolean {
@@ -608,7 +684,7 @@ export class GridStore<R extends object> {
       return null;
     }
     for (const group of groups.value) {
-      const open = this.openGroups.has(group.key);
+      const open = this.groupOpen(group.key);
       out.rows.push(group);
       out.depths.push(0);
       out.flags.push(GROUP | HAS_CHILDREN | (open ? EXPANDED : 0));

@@ -5,7 +5,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { consume } from '@lit/context';
 import { customElement, property } from 'lit/decorators.js';
 
-import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
 
 import type { LogIdentityItem } from '../features/app/logIdentity.js';
 import { globalStyles } from '../styles/global.styles.js';

@@ -9,12 +9,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { createRef, ref } from 'lit/directives/ref.js';
 
 import type { AppGrid } from '../../../components/grid/AppGrid.js';
-import {
-  COUNT_MIN_WIDTH,
-  countColumn,
-  inlineQueryColumn,
-  timeColumn,
-} from '../../../components/grid/columns.js';
+import { countColumn, inlineQueryColumn, timeColumn } from '../../../components/grid/columns.js';
 import {
   InspectorGridController,
   inspectorGridStyles,
@@ -23,12 +18,12 @@ import {
   dispatchInspectorLocate,
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
-import { TeardownController } from '../../../core/events/TeardownController.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { TeardownController } from '#core/events/TeardownController.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { sum, type GridColumn, type TreeSource } from '../../../grid/index.js';
 import { globalStyles } from '../../../styles/global.styles.js';
-import { progressColumnWidth } from '../../../components/grid/measureWidth.js';
 import {
   type DatabaseCallNode,
   databaseOverview,
@@ -47,7 +42,7 @@ export interface DatabaseTreeRow {
   /** The code's own time (ns): the row's frames, each less the children it ran. */
   selfNs: number;
   count: number;
-  eventIndexes: number[];
+  eventIds: number[];
   _children: DatabaseTreeRow[] | null;
 }
 
@@ -62,7 +57,7 @@ export function databaseTreeRows(tree: readonly DatabaseCallNode[]): DatabaseTre
       timeNs: node.timeNs,
       selfNs: node.selfNs,
       count: node.count,
-      eventIndexes: node.eventIndexes,
+      eventIds: node.eventIds,
       _children: node.children.length ? map(node.children) : null,
     }));
   return map(tree);
@@ -106,18 +101,18 @@ export class DatabaseTime extends LitElement {
   private readonly _inspector = new InspectorGridController<DatabaseTreeRow>(this, {
     grid: () => this._grid.value ?? null,
     source: () => this._source,
-    frames: (row) => row.eventIndexes,
+    frameIds: (row) => row.eventIds,
     // A frame or a merged row has no one statement to reveal, so its pick holds a mark on all of them.
     pick: (row) => {
-      const eventIndex = revealable(row);
-      if (eventIndex !== null) {
-        dispatchInspectorReveal(this, eventIndex);
+      const eventId = revealable(row);
+      if (eventId !== null) {
+        dispatchInspectorReveal(this, eventId);
       } else {
-        dispatchInspectorLocate(this, row?.eventIndexes ?? [], true);
+        dispatchInspectorLocate(this, row?.eventIds ?? [], true);
       }
     },
-    menuFrame: (row) => row.eventIndexes[0] ?? null,
-    keysFor: (eventIndexes) => this._rowIdsFor(eventIndexes),
+    menuFrame: (row) => row.eventIds[0] ?? null,
+    keysFor: (eventIds) => this._rowIdsFor(eventIds),
     dropOnClear: true,
   });
 
@@ -145,7 +140,7 @@ export class DatabaseTime extends LitElement {
       <lv-app-grid
         ${ref(this._grid)}
         .label=${'Database call tree'}
-        .placeholder=${NO_STATEMENTS}
+        .placeholder=${describeLevelGap(this.logStore?.levelGap('queries'), NO_STATEMENTS)}
         .source=${this._source}
         .columns=${this._columns}
         .marked=${this._inspector.marked}
@@ -155,9 +150,9 @@ export class DatabaseTime extends LitElement {
   }
 
   // One frame names several rows.
-  private _rowIdsFor(eventIndexes: readonly number[]): number[] {
-    const byEvent = (this._rowsByEvent ??= rowIdsByEventIndex(this._source?.roots ?? []));
-    return eventIndexes.flatMap((eventIndex) => byEvent.get(eventIndex) ?? []);
+  private _rowIdsFor(eventIds: readonly number[]): number[] {
+    const byEvent = (this._rowsByEvent ??= rowIdsByEventId(this._source?.roots ?? []));
+    return eventIds.flatMap((eventId) => byEvent.get(eventId) ?? []);
   }
 
   private async _build(): Promise<void> {
@@ -173,12 +168,7 @@ export class DatabaseTime extends LitElement {
       return;
     }
     const rows = overview ? databaseTreeRows(overview.tree) : [];
-    this._columns = databaseColumns(
-      overview?.time.timeNs ?? 0,
-      ownCodeTotal(rows),
-      // From the whole log, so the bars keep one width whatever share of it the database holds.
-      progressColumnWidth(overview?.time.logNs ?? 0),
-    );
+    this._columns = databaseColumns(overview?.time.timeNs ?? 0, ownCodeTotal(rows));
     this._setRows(rows);
     this._builtFor = store;
   }
@@ -190,11 +180,7 @@ export class DatabaseTime extends LitElement {
 }
 
 // Own code is a share of its own total: it is Apex, which the database time does not bound.
-function databaseColumns(
-  timeNs: number,
-  ownCodeNs: number,
-  width: number,
-): GridColumn<DatabaseTreeRow>[] {
+function databaseColumns(timeNs: number, ownCodeNs: number): GridColumn<DatabaseTreeRow>[] {
   return [
     inlineQueryColumn({
       id: 'label',
@@ -208,7 +194,6 @@ function databaseColumns(
       value: (row) => row.timeNs,
       totalNs: timeNs,
       calc: sum((row) => row.timeNs),
-      width,
     }),
     // Every row, child rows included: no row's own code overlaps another's.
     timeColumn({
@@ -217,13 +202,11 @@ function databaseColumns(
       value: (row) => row.selfNs,
       totalNs: ownCodeNs,
       calc: { of: () => ownCodeNs },
-      width,
     }),
     countColumn({
       id: 'count',
       title: 'Calls',
       value: (row) => row.count,
-      width: COUNT_MIN_WIDTH,
       summed: false,
     }),
   ];
@@ -245,21 +228,21 @@ export function ownCodeTotal(rows: readonly DatabaseTreeRow[]): number {
 
 /** The statement a row reveals, or null when it is a frame or merges several. */
 function revealable(row: DatabaseTreeRow | null): number | null {
-  return row?.kind && row.eventIndexes.length === 1 ? (row.eventIndexes[0] ?? null) : null;
+  return row?.kind && row.eventIds.length === 1 ? (row.eventIds[0] ?? null) : null;
 }
 
 /** The rows keyed by each occurrence they stand for. */
-function rowIdsByEventIndex(rows: readonly DatabaseTreeRow[]): Map<number, number[]> {
+function rowIdsByEventId(rows: readonly DatabaseTreeRow[]): Map<number, number[]> {
   const byEvent = new Map<number, number[]>();
   const stack = [...rows];
   while (stack.length) {
     const row = stack.pop()!; // non-empty: the loop condition just checked
-    for (const eventIndex of row.eventIndexes) {
-      const ids = byEvent.get(eventIndex);
+    for (const eventId of row.eventIds) {
+      const ids = byEvent.get(eventId);
       if (ids) {
         ids.push(row.id);
       } else {
-        byEvent.set(eventIndex, [row.id]);
+        byEvent.set(eventId, [row.id]);
       }
     }
     for (const child of row._children ?? []) {

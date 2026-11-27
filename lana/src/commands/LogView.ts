@@ -12,6 +12,7 @@ import { fileOrFolderExists, readFileText, writeFileText } from '../fs/workspace
 import { errorMessage } from '../tryCatch.js';
 import {
   PRIVATE_SECTIONS,
+  UI_SETTINGS,
   getColumnOverrides,
   getColumnViews,
   getConfig,
@@ -46,7 +47,7 @@ export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
   private static currentPanel: WebviewPanel | undefined;
   private static currentLogUri: Uri | undefined;
-  private static pendingNavigationTimestamp: number | undefined;
+  private static pendingNavigationEventId: number | undefined;
 
   static getCurrentView() {
     return LogView.currentPanel;
@@ -60,8 +61,8 @@ export class LogView {
     return LogView.currentLogUri;
   }
 
-  static setPendingNavigation(timestamp: number): void {
-    LogView.pendingNavigationTimestamp = timestamp;
+  static setPendingNavigation(eventId: number): void {
+    LogView.pendingNavigationEventId = eventId;
   }
 
   static async createView(
@@ -100,15 +101,18 @@ export class LogView {
       });
     });
     panel.webview.html = template
-      .replace(/bundle\.js/gi, bundleUri.toString(true))
-      .replace(/codicon\.css/gi, codiconUri.toString(true));
+      .replace(/bundle\.js/gi, bundleUri.toString())
+      .replace(/codicon\.css/gi, codiconUri.toString());
 
     // The panel keeps its context when hidden, so it is never re-created: settings
     // edits have to be pushed to it. Only push when the resolved payload actually
     // changed — every webview subscriber re-applies it.
     let lastConfig = LogView.resolveConfig(context);
     const configListener = workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration('lana')) {
+      if (
+        !event.affectsConfiguration('lana') &&
+        !UI_SETTINGS.some((setting) => event.affectsConfiguration(setting))
+      ) {
         return;
       }
 
@@ -305,18 +309,26 @@ export class LogView {
       }
     }
 
-    const navigateToTimestamp = LogView.pendingNavigationTimestamp;
-    LogView.pendingNavigationTimestamp = undefined;
+    // A `vscode-local` log is on the client of a remote window; the webview cannot fetch it.
+    let body: string | Uint8Array | undefined = logData;
+    if (!body && cachedUri?.scheme === 'vscode-local') {
+      const bytes = await workspace.fs.readFile(cachedUri);
+      // A Node `Buffer` is posted as a JSON array of numbers; a plain `Uint8Array` goes as binary.
+      body = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
+
+    const navigateToEventId = LogView.pendingNavigationEventId;
+    LogView.pendingNavigationEventId = undefined;
 
     panel.webview.postMessage({
       requestId,
       cmd: 'fetchLog',
       payload: {
         logName: logUri ? Utils.basename(logUri) : '',
-        logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString(true) : '',
+        logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString() : '',
         logPath: cachedUri ? getLogDisplayPath(cachedUri) : undefined,
-        logData: logData,
-        navigateToTimestamp,
+        logData: body,
+        navigateToEventId,
       },
     });
   }

@@ -8,10 +8,10 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import { CategoryPaletteController, categoryName } from '../../../components/categoryTime.js';
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
-import { DerivedValue } from '../../../core/log/DerivedValue.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration, formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { NO_TIMED_CALLS_TEXT } from '../../../components/governorCopy.js';
 import '../../../components/SectionSkeleton.js';
@@ -49,7 +49,7 @@ export class SelfTimeSpreadView extends LitElement {
   private readonly _palette = new CategoryPaletteController(this);
 
   /** The bin under the pointer, so the lane names what it is showing. */
-  @state() private _hovered: { eventIndex: number; bin: number } | null = null;
+  @state() private _hovered: { eventId: number; bin: number } | null = null;
 
   private readonly _spread = new DerivedValue(this, selfTimeSpread);
 
@@ -169,7 +169,7 @@ export class SelfTimeSpreadView extends LitElement {
         type="button"
         title=${title}
         style=${styleMap({ '--row-hue': this._palette.colorFor(row.category) })}
-        @click=${() => dispatchInspectorReveal(this, row.eventIndex)}
+        @click=${() => dispatchInspectorReveal(this, row.eventId)}
       >
         <!-- The hue is decorative, so the category it stands for is spoken here. -->
         <span class="reveal-row__sr">${categoryName(row.category)}</span>
@@ -202,7 +202,7 @@ export class SelfTimeSpreadView extends LitElement {
       `95th ${formatDuration(row.p95)}`,
       `worst ${formatDuration(row.max)}`,
     ].join(' · ');
-    const hovered = this._hovered?.eventIndex === row.eventIndex ? this._hovered.bin : null;
+    const hovered = this._hovered?.eventId === row.eventId ? this._hovered.bin : null;
     return this._row(
       row,
       title,
@@ -255,10 +255,10 @@ export class SelfTimeSpreadView extends LitElement {
     const lane = event.currentTarget as HTMLElement;
     const box = lane.getBoundingClientRect();
     const bin = binAt((event.clientX - box.left) / box.width);
-    if (this._hovered?.eventIndex === row.eventIndex && this._hovered.bin === bin) {
+    if (this._hovered?.eventId === row.eventId && this._hovered.bin === bin) {
       return;
     }
-    this._hovered = { eventIndex: row.eventIndex, bin };
+    this._hovered = { eventId: row.eventId, bin };
   }
 }
 

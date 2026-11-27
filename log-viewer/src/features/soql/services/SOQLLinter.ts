@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import type { Stack } from '../../../core/log/LogStore.js';
+import type { Stack } from '#core/log/LogStore.js';
 import type { SOQLTree } from './SOQLParser.js';
 import { SOQLParser } from './SOQLParser.js';
 
@@ -199,7 +199,7 @@ class TriggerNonSelectiveQuery implements SOQLLinterRule {
 
   test(_soqlTree: SOQLTree, stack: Stack): boolean {
     const inTriggerCtxt = stack.find((entry) => {
-      return entry.text.includes(' trigger event ');
+      return entry.text?.includes(' trigger event ');
     });
 
     return !!inTriggerCtxt;

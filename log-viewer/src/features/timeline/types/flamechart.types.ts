@@ -11,17 +11,13 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogEvent, LogCategory, LogIssue } from '@apexdevtools/apex-log-parser';
-import { formatDuration } from '../../../core/utility/Util.js';
+import type { ApexEvent, LogIssue } from '@apexdevtools/apex-log-parser';
+import type { LogCategory } from '#core/log/category.js';
+import { formatDuration } from '#core/utility/Util.js';
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
-export { NO_ROW } from '../../../core/log/LogIndex.js';
-
-// Re-export LogEvent for internal use within timeline/ folder
-// Note: FlameChart's PUBLIC API (callbacks) should use EventNode, not LogEvent
-// LogEvent is only used internally by data structures like RectangleCache, HitDetector
-export type { LogEvent };
+export { NO_ROW } from '#core/log/LogIndex.js';
 
 // Re-export formatDuration for use within timeline/optimised folder
 // This keeps the Util.ts dependency at the boundary (types file)
@@ -125,7 +121,7 @@ export interface EventNode {
   /** Display text for event */
   text: string;
 
-  /** Optional reference to original data (e.g., LogEvent) - used by adapter layer */
+  /** Optional reference to original data (e.g., ApexEvent) - used by adapter layer */
   original?: unknown;
 }
 
@@ -156,23 +152,16 @@ export interface TreeNode<T extends EventNode> {
  * A row is shown when it and every parent have a duration. Only a shown row has
  * a place at its depth, a node, or a rect.
  */
-export interface TimelineFrames<E extends EventNode> {
+export interface TimelineFrames<E extends EventNode> extends RectColumns {
   readonly rowCount: number;
   /** The deepest shown row. */
   readonly maxDepth: number;
   /** The end of the last shown row, or of the log if that is later. */
   readonly totalDuration: number;
-  readonly start: Float64Array;
-  readonly total: Float64Array;
-  readonly depth: Uint16Array;
   /** {@link NO_ROW} for a top-level row. */
   readonly parent: Int32Array;
   /** The first row after this row's subtree. */
   readonly subtreeEnd: Int32Array;
-  /** Every rect, by category. */
-  readonly rectsByCategory: Map<string, PrecomputedRect[]>;
-  /** Every rect, by depth, each list in pre-order. */
-  readonly rectsByDepth: Map<number, PrecomputedRect[]>;
 
   isVisible(row: number): boolean;
   /** The shown rows at a depth, ascending by start. */
@@ -183,8 +172,35 @@ export interface TimelineFrames<E extends EventNode> {
   type(row: number): string;
   /** The shown row for an {@link EventNode.original}, or {@link NO_ROW}. */
   rowOfOriginal(original: unknown): number;
+  hasRect(row: number): boolean;
+}
+
+/**
+ * Every row's place and category, as columns by row. Only `rectRowsByDepth` and
+ * `rectOf` are limited to the rows with a rect: what the segment tree indexes.
+ */
+export interface RectColumns {
+  /** Start, in ns. */
+  readonly start: Float64Array;
+  /** Duration including children, in ns. */
+  readonly total: Float64Array;
+  readonly depth: Uint16Array;
+  /** An index into {@link categoryNames}. */
+  readonly categoryId: Uint8Array;
+  /** Index 0 is no category, which no rect has. */
+  readonly categoryNames: readonly string[];
+  /** The rows with a rect at each depth, ascending by start. */
+  readonly rectRowsByDepth: readonly Int32Array[];
   rectOf(row: number): PrecomputedRect | undefined;
 }
+
+/** `row`'s category name. */
+export function rectCategory(columns: RectColumns, row: number): string {
+  return columns.categoryNames[columns.categoryId[row]!]!;
+}
+
+/** How far the frames reach: in time, and in depth. */
+export type TimelineExtent = Pick<TimelineFrames<EventNode>, 'maxDepth' | 'totalDuration'>;
 
 // ============================================================================
 // RENDERING STRUCTURES
@@ -223,8 +239,8 @@ export interface RenderRectangle {
   /** Height in pixels (constant EVENT_HEIGHT). */
   height: number;
 
-  /** Reference to source event (for tooltips/click handling). */
-  eventRef: LogEvent;
+  /** The frame's row in {@link TimelineFrames}. */
+  row: number;
 }
 
 // ============================================================================
@@ -246,7 +262,7 @@ export interface RenderRectangle {
 export interface RenderDirtyState {
   /** Background layers: markers, axis positioning */
   background: boolean;
-  /** Rectangle culling (expensive - O(n) viewport query) */
+  /** Rectangle culling (viewport query) */
   culling: boolean;
   /** Event rendering: batch renderer, text labels */
   eventRendering: boolean;
@@ -261,9 +277,6 @@ export interface RenderDirtyState {
 }
 
 export interface TimelineState {
-  /** Input event data. */
-  events: LogEvent[];
-
   /** Viewport state. */
   viewport: ViewportState;
 
@@ -277,7 +290,7 @@ export interface TimelineState {
   interaction: {
     isDragging: boolean;
     lastMousePos: { x: number; y: number };
-    hoveredEvent: LogEvent | null;
+    hoveredEvent: EventNode | null;
   };
 
   /** Flags. */
@@ -347,8 +360,8 @@ export interface TimelineOptions {
   editorColors?: EditorColors;
 
   /** Event handlers for user interactions. */
-  onEventClick?: (event: LogEvent) => void;
-  onEventHover?: (event: LogEvent | null) => void;
+  onEventClick?: (event: ApexEvent) => void;
+  onEventHover?: (event: ApexEvent | null) => void;
   onViewportChange?: (viewport: ViewportState) => void;
   onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
 }
@@ -365,46 +378,6 @@ export interface CategoryAggregation {
   count: number;
   /** Total duration in nanoseconds */
   totalDuration: number;
-}
-
-/**
- * Merge category stats from a SegmentNode into a target map.
- * Handles both leaf nodes (leafCategory/leafDuration) and branch nodes (categoryStats Map).
- *
- * PERF: Extracted helper to avoid duplicating this ~20-line pattern in 3+ places.
- *
- * @param target - Map to merge stats into
- * @param node - SegmentNode with either categoryStats (branch) or leafCategory/leafDuration (leaf)
- */
-export function mergeNodeCategoryStats(
-  target: Map<string, CategoryAggregation>,
-  node: {
-    categoryStats: Map<string, CategoryAggregation> | null;
-    leafCategory?: string;
-    leafDuration?: number;
-  },
-): void {
-  if (node.categoryStats) {
-    // Branch node: merge from Map
-    for (const [category, stats] of node.categoryStats) {
-      const existing = target.get(category);
-      if (existing) {
-        existing.count += stats.count;
-        existing.totalDuration += stats.totalDuration;
-      } else {
-        target.set(category, { count: stats.count, totalDuration: stats.totalDuration });
-      }
-    }
-  } else if (node.leafCategory !== undefined && node.leafDuration !== undefined) {
-    // Leaf node: use leafCategory/leafDuration directly
-    const existing = target.get(node.leafCategory);
-    if (existing) {
-      existing.count += 1;
-      existing.totalDuration += node.leafDuration;
-    } else {
-      target.set(node.leafCategory, { count: 1, totalDuration: node.leafDuration });
-    }
-  }
 }
 
 /**
@@ -427,18 +400,16 @@ export interface PixelBucket {
   x: number;
   /** Screen Y position (depth * EVENT_HEIGHT) */
   y: number;
-  /** Start time in nanoseconds (time-aligned boundary) */
-  timeStart: number;
-  /** End time in nanoseconds */
-  timeEnd: number;
+  /** Start, in nanoseconds, of the first frame it holds */
+  firstStart: number;
+  /** Start, in nanoseconds, of the last frame it holds: it can lie past the bucket's cell */
+  lastStart: number;
   /** Call stack depth (0-indexed) */
   depth: number;
   /** Number of aggregated events */
   eventCount: number;
   /** Per-category statistics */
   categoryStats: CategoryStats;
-  /** Source event references for tooltip/click */
-  eventRefs: LogEvent[];
   /** Resolved display color (hex number) - pre-blended opaque color for rendering */
   color: number;
 }
@@ -481,9 +452,6 @@ export interface CulledRenderData {
 export const TIMELINE_CONSTANTS = {
   /** Height of each event rectangle in pixels. */
   EVENT_HEIGHT: 15,
-
-  /** Minimum rectangle width in pixels before culling (events below this go to buckets). */
-  MIN_RECT_SIZE: 2,
 
   /** Gap between rectangles in pixels (negative space separation). */
   RECT_GAP: 1,
@@ -614,7 +582,7 @@ export type TimeDisplayMode = 'elapsed' | 'wallClock';
 
 /**
  * Represents a time range in the log where Marker occurred.
- * Extracted from ApexLog.logIssues during timeline initialization.
+ * Extracted from ApexLog.issues during timeline initialization.
  */
 export interface TimelineMarker {
   /**
@@ -650,7 +618,7 @@ export interface TimelineMarker {
   endTime?: number;
 
   /** Parser-assigned event identity when the marker corresponds to a concrete event. */
-  eventIndex?: number;
+  eventId?: number;
 
   /**
    * Optional additional context about the marker.
@@ -831,10 +799,17 @@ export interface HeatStripMetricValue {
   limit: number;
   /**
    * Increment-only total from detailed events, set only for delta-tracked metrics and only
-   * when it diverges below `used` (i.e. the log dropped events the cumulative snapshot counted).
-   * Undefined means no divergence / metric has no granular source.
+   * when it differs from `used`: below, the log dropped events the cumulative snapshot counted;
+   * above, Salesforce did not charge everything we saw. Undefined means the two agree, or the
+   * metric has no granular source.
    */
   tracked?: number;
+  /**
+   * `used` before the ceiling of the highest cumulative report, set only where that ceiling held
+   * `used` below it. Our count stands until the next report corrects it, so a reader that gives
+   * usage to rows reads this, not `used`.
+   */
+  uncapped?: number;
 }
 
 /**
@@ -914,7 +889,7 @@ export interface MetricStripRawValue {
   used: number;
   /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
-  /** Increment-only tracked total, present only when it diverges below `used`. See HeatStripMetricValue.tracked. */
+  /** Increment-only tracked total, present only when it differs from `used`. See HeatStripMetricValue.tracked. */
   tracked?: number;
 }
 
@@ -959,69 +934,12 @@ export interface MetricStripProcessedData {
 // ============================================================================
 
 /**
- * Node in the temporal segment tree.
- *
- * Leaf nodes represent individual events; branch nodes aggregate children.
- * The tree is used for O(log n) viewport culling and bucket aggregation,
- * replacing the per-frame O(n) iteration in RectangleCache.
- *
- * Key optimization: Pre-computed category stats enable instant bucket
- * rendering without recalculating aggregates per frame.
- */
-export interface SegmentNode {
-  // Time bounds (nanoseconds)
-  /** Start time of this node's span (nanoseconds) */
-  timeStart: number;
-  /** End time of this node's span (nanoseconds) */
-  timeEnd: number;
-
-  /** Time span = timeEnd - timeStart (nanoseconds) */
-  nodeSpan: number;
-
-  // Category statistics (for tooltips and color resolution)
-  /**
-   * Per-category event counts and durations.
-   * null for leaf nodes (use leafCategory/leafDuration instead to avoid Map allocation).
-   */
-  categoryStats: Map<string, CategoryAggregation> | null;
-  /** Winning category after priority/duration/count resolution */
-  dominantCategory: string;
-  /** Pre-computed priority for dominantCategory (avoids map lookup during query) */
-  dominantPriority: number;
-
-  // Leaf-specific fields (avoid Map allocation for 500k+ leaf nodes)
-  /** For leaf nodes only: category string (avoids Map allocation) */
-  leafCategory?: string;
-  /** For leaf nodes only: duration value (avoids Map allocation) */
-  leafDuration?: number;
-
-  // Event tracking
-  /** Total event count in this subtree */
-  eventCount: number;
-  /** For leaf nodes only: reference to source event */
-  eventRef?: LogEvent;
-  /** For leaf nodes only: direct reference to PrecomputedRect (avoids O(n) lookup) */
-  rectRef?: PrecomputedRect;
-
-  // Tree structure
-  /** Child nodes (null for leaf nodes) */
-  children: SegmentNode[] | null;
-  /** Whether this is a leaf node */
-  isLeaf: boolean;
-
-  /** Call stack depth (0-indexed) */
-  depth: number;
-}
-
-/**
  * Constants for segment tree construction and traversal.
  */
 
 export const SEGMENT_TREE_CONSTANTS = {
   /**
    * Branching factor for tree construction.
-   * 4 provides a good balance between tree height (log4(n) levels)
-   * and cache efficiency (4 children fit in a cache line).
    */
   BRANCHING_FACTOR: 4,
 

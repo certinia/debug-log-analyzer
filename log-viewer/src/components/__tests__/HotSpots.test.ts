@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import type { LogStore } from '../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { ExecutionHighlights } from '../../features/call-tree/utils/ExecutionHighlights.js';
 
 let highlights: ExecutionHighlights | null = null;
@@ -24,7 +24,7 @@ const spotsOf = (): ExecutionHighlights => ({
   hotSpots: [
     {
       text: 'MyClass.run()',
-      eventIndex: 3,
+      eventId: 3,
       selfTime: 200_000_000,
       totalTime: 400_000_000,
       count: 4,

@@ -1,127 +1,80 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser';
+import { eventType } from '@apexdevtools/apex-log-parser';
 
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
-import { costLimitsOf, setGovernorCost } from './GovernorCost.js';
+import type { LogCategory } from '#core/log/category.js';
+import { rowKinds } from '#core/log/eventKind.js';
+import { childRows, rowCategory, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import { type Signatures, signaturesOf } from '#core/log/signatures.js';
+import { namespaceOf } from '#core/utility/CallerNamespace.js';
+import type { RowFilter, TreeSource } from '../../../grid/index.js';
 
-/**
- * One row per LogEvent for the time-order view; no merging at any level.
- */
-export interface TimeOrderRow {
-  id: number;
-  originalData: LogEvent;
-  _children: TimeOrderRow[] | null;
-  text: string;
-  namespace: string;
-  callerNamespace: string;
-  /** Event type (e.g. METHOD_ENTRY) — an optional column, off by default. */
-  type: string;
-  duration: SelfTotal;
-  dmlCount: SelfTotal;
-  soqlCount: SelfTotal;
-  soslCount: SelfTotal;
-  dmlRowCount: SelfTotal;
-  soqlRowCount: SelfTotal;
-  soslRowCount: SelfTotal;
-  thrownCount: SelfTotal;
-  heapAllocated: SelfTotal;
-  /** Total + self gross heap bytes allocated (frees ignored) — churn */
-  heapGross: SelfTotal;
-  /** Peak live heap (bytes) reached in this node's subtree — the limit-comparable value */
-  heapPeak: number;
-  /** Average governor consumption across all reported governors (0–100%); null if none. */
-  governorCost: number | null;
-  /** The single tightest governor consumed on this path (0–100+%). */
-  governorCostMax: number | null;
-  /**
-   * True when this row is itself a "detail" (the per-row predicate matches —
-   * non-zero `duration.total`, `isParent`, `discontinuity`, or a type in
-   * `EXCLUDED_DETAIL_TYPES`) OR any descendant has `_hasDetailsDeep === true`.
-   * Precomputed bottom-up at tree-build time so the Show-Details filter is
-   * an O(1) property read instead of a recursive walk.
-   */
-  _hasDetailsDeep: boolean;
+/** One shown event in the Time Order view: a row of the log index. */
+export interface TimeOrderNode {
+  readonly row: number;
 }
 
-/** Whether the Show Details filter shows `event` for itself, before its descendants count. */
-export function isDetailEvent(event: LogEvent): boolean {
-  const { type } = event;
-  return (
-    event.isParent ||
-    event.duration.total > 0 ||
-    event.discontinuity ||
-    !!(type && EXCLUDED_DETAIL_TYPES.has(type))
-  );
+interface HeldNode extends TimeOrderNode {
+  children?: readonly HeldNode[] | null;
 }
 
 /**
- * Builds the time-order view: one row per LogEvent at every level. Row ids
- * use parser-assigned eventIndex values, which are globally unique within
- * the parse and safe for deepFilter cache keys.
+ * The Time Order rows: one node per shown event, read from the index rows.
+ *
+ * The grid tells rows apart by object, so a node is made once: a parent's child
+ * nodes on the first ask, then held. Nothing is built for a subtree no one opens.
  */
-export function toTimeOrderTree(
-  nodes: LogEvent[],
-  governorLimits?: GovernorLimits,
-): TimeOrderRow[] | undefined {
-  const len = nodes.length;
-  if (!len) {
-    return undefined;
-  }
-  const costLimits = governorLimits && costLimitsOf(governorLimits);
+export class TimeOrderSource implements TreeSource<TimeOrderNode> {
+  readonly index: LogIndex;
+  readonly roots: readonly TimeOrderNode[];
+  /** The rows shown with Details off: frames and pinned details. */
+  readonly withoutDetails: RowFilter<TimeOrderNode>;
+  private readonly signatures: Signatures;
+  private readonly types: Uint16Array;
 
-  function buildRow(event: LogEvent): TimeOrderRow {
-    const id = event.eventIndex;
-    const children = event.children;
-    const childCount = children.length;
-    let mappedChildren: TimeOrderRow[] | null = null;
-    let childHasDetailsDeep = false;
-    if (childCount > 0) {
-      mappedChildren = new Array<TimeOrderRow>(childCount);
-      for (let i = 0; i < childCount; i++) {
-        const childRow = buildRow(children[i]!);
-        mappedChildren[i] = childRow;
-        if (childRow._hasDetailsDeep) {
-          childHasDetailsDeep = true;
-        }
-      }
-    }
-    const { type } = event;
-    const selfIsDetail = isDetailEvent(event);
-    const row: TimeOrderRow = {
-      id,
-      originalData: event,
-      _children: mappedChildren,
-      text: event.text,
-      namespace: event.namespace,
-      callerNamespace: getCallerNamespace(event),
-      type: type ?? '',
-      duration: event.duration,
-      dmlCount: event.dmlCount,
-      soqlCount: event.soqlCount,
-      soslCount: event.soslCount,
-      dmlRowCount: event.dmlRowCount,
-      soqlRowCount: event.soqlRowCount,
-      soslRowCount: event.soslRowCount,
-      thrownCount: event.thrownCount,
-      heapAllocated: event.heapAllocated,
-      heapGross: event.heapGross,
-      heapPeak: event.heapPeak,
-      governorCost: 0,
-      governorCostMax: 0,
-      _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,
-    };
-    if (costLimits) {
-      setGovernorCost(row, costLimits);
-    }
-    return row;
+  constructor(index: LogIndex) {
+    this.index = index;
+    this.signatures = signaturesOf(index.log);
+    this.roots = this.nodesUnder(NO_ROW);
+    this.types = index.column(index.log.columns.type);
+    const kindOf = rowKinds(index);
+    // No keepAncestors: a row with children is a frame or a pinned block, and both pass.
+    this.withoutDetails = { test: ({ row }) => kindOf(row) !== 'detail' };
   }
 
-  const results = new Array<TimeOrderRow>(len);
-  for (let i = 0; i < len; i++) {
-    results[i] = buildRow(nodes[i]!);
+  readonly children = (node: TimeOrderNode): readonly TimeOrderNode[] | null => {
+    const held = node as HeldNode;
+    if (held.children === undefined) {
+      held.children =
+        this.index.subtreeEnd[node.row]! > node.row + 1 ? this.nodesUnder(node.row) : null;
+    }
+    return held.children;
+  };
+
+  /** The node's event id. */
+  readonly key = (node: TimeOrderNode): number => this.index.eventId[node.row]!;
+
+  /** The signature id of the node's event. */
+  private readonly signatureOf = ({ row }: TimeOrderNode): number =>
+    this.signatures.of(this.index.eventId[row]!);
+
+  /** The node's text, as its signature names it. */
+  readonly text = (node: TimeOrderNode): string => this.signatures.text(this.signatureOf(node));
+
+  // Namespace and type read their columns: the signature reads text, and its first read builds the whole log's.
+  /** The node's namespace. */
+  readonly namespace = (node: TimeOrderNode): string =>
+    namespaceOf(this.index.log, this.index.eventId[node.row]!);
+
+  /** The node's event type. */
+  readonly type = ({ row }: TimeOrderNode): string => eventType(this.types[row]!)!.type; // every type id came from columns.type
+
+  /** The timeline category of the node's event. */
+  readonly category = ({ row }: TimeOrderNode): LogCategory => rowCategory(this.index, row);
+
+  private nodesUnder(row: number): HeldNode[] {
+    // `children` declared up front: added later, it costs each node a second property store.
+    return childRows(this.index, row).map((child) => ({ row: child, children: undefined }));
   }
-  return results;
 }

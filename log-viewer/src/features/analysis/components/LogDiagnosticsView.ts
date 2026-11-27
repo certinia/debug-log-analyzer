@@ -7,11 +7,12 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
-import { ResizeController } from '../../../core/events/ResizeController.js';
-import { DerivedValue } from '../../../core/log/DerivedValue.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { formatDuration } from '../../../core/utility/Util.js';
+import { ResizeController } from '#core/events/ResizeController.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration } from '#core/utility/Util.js';
 import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
 import { SEVERITY_TYPES, type Severity } from '../../soql/services/SOQLLinter.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
@@ -58,7 +59,7 @@ const MIN_SHARE = 0.01;
  * The Analysis tab's findings: what the log says is slow or wrong, and what to do
  * about it. The list is the shape every comparable tool uses for this.
  *
- * With {@link instances} set the same findings re-scope to one method — which of
+ * With {@link eventIds} set the same findings re-scope to one method — which of
  * them name it or anything it called — so the pane answers what the grid beside
  * it cannot: whether the row the reader picked is one of the log's problems.
  *
@@ -70,7 +71,7 @@ const MIN_SHARE = 0.01;
 export class LogDiagnosticsView extends LitElement {
   /** The selected method's occurrences, or null for the whole log. */
   @property({ attribute: false })
-  instances: readonly number[] | null = null;
+  eventIds: readonly number[] | null = null;
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
@@ -92,7 +93,7 @@ export class LogDiagnosticsView extends LitElement {
   @state()
   private _open: ReadonlySet<string> = new Set();
 
-  /** {@link _findings}, narrowed to {@link instances}. */
+  /** {@link _findings}, narrowed to {@link eventIds}. */
   private _result: LogDiagnostics | null = null;
 
   /** The occurrences {@link _result} was scoped to. See {@link willUpdate}. */
@@ -109,7 +110,7 @@ export class LogDiagnosticsView extends LitElement {
     const all = this._findings.value ?? null;
     // Keyed on the occurrences themselves: the host builds the array in its own
     // render, so its identity changes even when the selection has not.
-    const scope = this.instances?.join(',') ?? '';
+    const scope = this.eventIds?.join(',') ?? '';
     if (scope === this._scope && all === this._scoped) {
       return;
     }
@@ -120,8 +121,8 @@ export class LogDiagnosticsView extends LitElement {
     this._filters = [];
     this._open = new Set();
     this._result =
-      all && this.logStore && this.instances
-        ? scopeDiagnostics(this.logStore.log, all, this.instances)
+      all && this.logStore && this.eventIds
+        ? scopeDiagnostics(this.logStore.log, all, this.eventIds)
         : all;
   }
 
@@ -420,7 +421,7 @@ export class LogDiagnosticsView extends LitElement {
     if (!result) {
       return html`<section-skeleton shape="rows" fallback="Analysing the log…"></section-skeleton>`;
     }
-    const scoped = this.instances !== null;
+    const scoped = this.eventIds !== null;
     const filters = this._filters;
     const shown = filters.length
       ? result.diagnostics.filter(
@@ -578,7 +579,7 @@ export class LogDiagnosticsView extends LitElement {
     ];
   }
 
-  private _evidenceLine({ text, eventIndex, count, dialect }: DiagnosticEvidence) {
+  private _evidenceLine({ text, eventId, count, dialect }: DiagnosticEvidence) {
     const body = dialect
       ? html`<span class="evidence__text evidence__text--code soql-block"
           >${formatSOQLToTemplate(text, {
@@ -589,14 +590,14 @@ export class LogDiagnosticsView extends LitElement {
         >`
       : html`<span class="evidence__text">${text}</span>`;
     const ran = count && count > 1 ? html`<span class="evidence__count">${count}×</span>` : '';
-    if (eventIndex < 0) {
+    if (eventId < 0) {
       return html`<div class="evidence" title=${text}>${body}${ran}</div>`;
     }
     return html`<button
       class="evidence evidence--link"
       type="button"
       title=${text}
-      @click=${() => dispatchInspectorReveal(this, eventIndex)}
+      @click=${() => dispatchInspectorReveal(this, eventId)}
     >
       ${body}${ran}
       <vscode-icon class="evidence__go" name="arrow-right"></vscode-icon>
@@ -608,7 +609,7 @@ export class LogDiagnosticsView extends LitElement {
     const caveats: string[] = [];
     if (!result.queryPlansKnown) {
       caveats.push(
-        'To see query plan findings, re-run the log with the Database log level at FINEST.',
+        describeLevelGap(this.logStore?.levelGap('queryPlans'), 'The log has no query plans.'),
       );
     }
     const { linted, distinct } = result.lintedQueries;

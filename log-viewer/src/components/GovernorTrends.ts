@@ -5,12 +5,12 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, svg, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { eventBus } from '../core/events/EventBus.js';
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import { RangeScopeController } from '../core/log/rangeScope.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { formatDuration } from '../core/utility/Util.js';
+import { eventBus } from '#core/events/EventBus.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import { RangeScopeController } from '#core/log/rangeScope.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration } from '#core/utility/Util.js';
 import {
   GOVERNOR_WARN_PERCENT,
   governorTier,
@@ -26,6 +26,7 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
 import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
 import './SectionSkeleton.js';
 
@@ -243,11 +244,6 @@ export class GovernorTrends extends LitElement {
         overflow: visible;
       }
 
-      .trend__chart:focus-visible {
-        outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-inset);
-      }
-
       .trend--safe {
         color: var(--lana-severity-ok);
       }
@@ -311,13 +307,15 @@ export class GovernorTrends extends LitElement {
     }
     const series = governorTrendSeries(limitSeries);
     if (!series.length) {
-      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
+      const text = describeLevelGap(this.logStore?.levelGap('limits'), NO_GOVERNOR_USAGE_TEXT);
+      return html`<p class="note">${text}</p>`;
     }
 
-    // `exitStamp`, not `duration.total`: readings carry the log's own timestamps, and the Timeline
+    // The log's end, not `duration.total`: readings carry the log's own timestamps, and the Timeline
     // runs from 0 to the last one. Measuring from the first event instead put every reading right
     // of where the Timeline draws it, and seeked short of the instant the reader pointed at.
-    const logTotal = apexLog.exitStamp;
+    // Row 0 of the columns is the log itself.
+    const logTotal = apexLog.columns.endTimestamp[0]!;
     return html`<div class="trends">${series.map((s) => this._renderTrend(s, logTotal))}</div>`;
   }
 

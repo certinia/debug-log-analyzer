@@ -5,9 +5,9 @@ import { LitElement, css, html, nothing } from 'lit';
 import { consume } from '@lit/context';
 import { customElement, property } from 'lit/decorators.js';
 
-import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
 
-import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 // styles
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';

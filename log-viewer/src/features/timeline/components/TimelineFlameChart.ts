@@ -12,19 +12,23 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { setRange, windowFor } from '../../../core/log/rangeScope.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
-import { debounce, isVisible, setChanged } from '../../../core/utility/Util.js';
-import { themeObserver } from '../../../core/theme/ThemeObserver.js';
+import { ResizeController } from '#core/events/ResizeController.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { setRange, windowFor } from '#core/log/rangeScope.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
+import { debounce, isVisible, setChanged } from '#core/utility/Util.js';
+import { themeObserver } from '#core/theme/ThemeObserver.js';
+import { FindController } from '../../find/FindController.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
+import { MIN_CHART_HEIGHT } from '../optimised/chartLayout.js';
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
 import { calculateViewportBounds } from '../optimised/ViewportUtils.js';
 import type { EditorColors, TimelineOptions, ViewportState } from '../types/flamechart.types.js';
 import { TimelineError } from '../types/flamechart.types.js';
 
+import type { TimelineNavigateRequest } from '../navigation.js';
 import { tokenStyles } from '../../../styles/tokens.styles.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 
@@ -52,6 +56,24 @@ export class TimelineFlameChart extends LitElement {
         inset: 0;
       }
 
+      .timeline-container--small .timeline-layer {
+        visibility: hidden;
+      }
+
+      .too-small {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--lana-space-lg);
+        color: var(--lana-fg-muted);
+        font-size: var(--lana-text-base);
+        text-align: center;
+        /* Always present, so a screen reader announces the note when it appears. */
+        pointer-events: none;
+      }
+
       .error-message {
         position: absolute;
         top: 50%;
@@ -77,24 +99,18 @@ export class TimelineFlameChart extends LitElement {
    * Existing property for compatibility with current application.
    */
   @property({ type: Object })
-  apexLog: ApexLog | null = null;
+  logStore: LogStore | null = null;
 
   @property()
   themeName: string | null = null;
 
   /**
-   * Timestamp to navigate to after initialization.
+   * The event to move to: at once if the chart is built, else once it is.
    * Used when opening the timeline from a raw log file hover.
    */
-  @property({ type: Number })
-  navigateToTimestamp: number | undefined = undefined;
-
-  /**
-   * Event index to navigate to after initialization.
-   * Preferred over timestamp because it is unique within a parse.
-   */
-  @property({ type: Number })
-  navigateToEventIndex: number | undefined = undefined;
+  // No hasChanged: each request is a new object, so the same event asked for twice moves again.
+  @property({ attribute: false })
+  navigateRequest: TimelineNavigateRequest | undefined = undefined;
 
   /**
    * Show the hover/selection details panel. A property, not a setter, so the value
@@ -123,6 +139,12 @@ export class TimelineFlameChart extends LitElement {
   @state()
   private errorMessage: string | null = null;
 
+  /** The container is too short to draw in, so the chart waits, or hides, until it grows. */
+  @state()
+  private tooSmall = false;
+  /** A build skipped for size, run once the container grows: its `keepViewport`, else null. */
+  private sizeDeferred: boolean | null = null;
+
   private apexLogTimeline: ApexLogTimeline | null = null;
   /** The element {@link apexLogTimeline} draws in. */
   private timelineLayer: HTMLElement | null = null;
@@ -133,7 +155,15 @@ export class TimelineFlameChart extends LitElement {
 
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
+  // The prop is never cleared, so a rebuild would otherwise jump back to it.
+  private usedRequest: TimelineNavigateRequest | undefined;
   private visibilityWait: AbortController | null = null;
+
+  private readonly finder = new FindController(this, {
+    targets: () => (this.apexLogTimeline ? [this.apexLogTimeline.findTarget] : []),
+  });
+
+  private readonly resize = new ResizeController(this, () => this.checkSize());
 
   private readonly subscriptions = new SubscriptionController(this, () => [
     themeObserver.on(() => {
@@ -146,7 +176,7 @@ export class TimelineFlameChart extends LitElement {
 
     // `updated` re-initialises only when the log or the options change, so a
     // re-attach would otherwise leave the destroyed Pixi app unrebuilt.
-    if (this.apexLog) {
+    if (this.logStore) {
       void this.initializeTimeline();
     }
   }
@@ -159,16 +189,32 @@ export class TimelineFlameChart extends LitElement {
     this.cleanup();
   }
 
+  override firstUpdated(): void {
+    this.resize.observe(this.containerRef);
+  }
+
+  private checkSize(): void {
+    const height = this.containerRef?.getBoundingClientRect().height;
+    // 0 is a hidden tab, not a short one.
+    if (!height) {
+      return;
+    }
+    this.tooSmall = !!this.logStore && height < MIN_CHART_HEIGHT;
+    if (!this.tooSmall && this.sizeDeferred !== null) {
+      void this.initializeTimeline(this.sizeDeferred);
+    }
+  }
+
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
 
-    // Re-initialize if apexLog or options change
+    // Re-initialize if the log or options change
     if (
-      (changedProperties.has('apexLog') || changedProperties.has('options')) &&
+      (changedProperties.has('logStore') || changedProperties.has('options')) &&
       this.containerRef
     ) {
       // A log replacing a log is the same transaction filtered, so the reader keeps their place.
-      void this.initializeTimeline(!!changedProperties.get('apexLog'));
+      void this.initializeTimeline(!!changedProperties.get('logStore'));
     } else if (changedProperties.has('themeName')) {
       // `else`: opening a log lands both properties in one update, and
       // `initializeTimeline` already reads the current appearance. Only the
@@ -185,6 +231,18 @@ export class TimelineFlameChart extends LitElement {
     if (changedProperties.has('dimCategories')) {
       this.apexLogTimeline?.setCategoryDim(this.dimCategories);
     }
+    if (changedProperties.has('navigateRequest')) {
+      this.followNavigateRequest();
+    }
+  }
+
+  private followNavigateRequest(): void {
+    const request = this.navigateRequest;
+    if (!this.apexLogTimeline || !request || request === this.usedRequest) {
+      return;
+    }
+    this.usedRequest = request;
+    this.apexLogTimeline.navigateToEventId(request.eventId);
   }
 
   /**
@@ -208,7 +266,7 @@ export class TimelineFlameChart extends LitElement {
    * Initialize PixiJS timeline renderer.
    */
   private async initializeTimeline(keepViewport = false): Promise<void> {
-    if (!this.containerRef || !this.apexLog) {
+    if (!this.containerRef || !this.logStore) {
       return;
     }
     this.visibilityWait?.abort();
@@ -221,13 +279,25 @@ export class TimelineFlameChart extends LitElement {
       }
     }
 
+    // Pixi cannot lay out the chart below this height.
+    const height = this.containerRef.getBoundingClientRect().height;
+    this.tooSmall = height > 0 && height < MIN_CHART_HEIGHT;
+    this.sizeDeferred = this.tooSmall ? keepViewport : null;
+    if (this.tooSmall) {
+      // A build already in flight is for older data, so it must not land.
+      this.initEpoch++;
+      return;
+    }
+
     // A re-init still in flight has no timeline yet, so it hands on the place it was given.
     const viewport = keepViewport
       ? (this.apexLogTimeline?.getViewport() ?? this.pendingViewport)
       : null;
     this.pendingViewport = viewport;
+    // A request the old chart took while this one builds still applies to this one.
+    const usedBefore = this.usedRequest;
 
-    if (this.apexLog.duration.total === 0) {
+    if (this.logStore.log.duration.total === 0) {
       this.cleanup();
       this.errorMessage = 'Nothing to show';
       return;
@@ -264,17 +334,16 @@ export class TimelineFlameChart extends LitElement {
       };
 
       const timeline = new ApexLogTimeline();
-      await timeline.init(layer, this.apexLog, optionsWithTheme);
+      await timeline.init(layer, this.logStore, optionsWithTheme);
       timeline.setTooltipEnabled(this.showTooltip);
       timeline.setCategoryDim(this.dimCategories);
 
-      // Navigate after initialization completes, preferring unique eventIndex.
-      if (viewport) {
+      // Navigate after initialization completes. A new request is newer than the place kept.
+      const request = this.navigateRequest;
+      if (request && request !== usedBefore) {
+        timeline.navigateToEventId(request.eventId);
+      } else if (viewport) {
         timeline.setViewport(viewport);
-      } else if (this.navigateToEventIndex !== undefined) {
-        timeline.navigateToEventIndex(this.navigateToEventIndex);
-      } else if (this.navigateToTimestamp !== undefined) {
-        timeline.navigateToTimestamp(this.navigateToTimestamp);
       }
       // The move above draws on the next frame; showing the layer sooner would flash the default view.
       await waitForNextFrame();
@@ -290,6 +359,10 @@ export class TimelineFlameChart extends LitElement {
       this.cleanup();
       layer.style.visibility = '';
       this.apexLogTimeline = timeline;
+      this.usedRequest = request;
+      // One sent while the first frame drew.
+      this.followNavigateRequest();
+      void this.finder.rerun();
       this.timelineLayer = layer;
       this.pendingViewport = null;
     } catch (error) {
@@ -377,8 +450,9 @@ export class TimelineFlameChart extends LitElement {
       measurement && measurement.endTime > measurement.startTime
         ? { timeStart: measurement.startTime, timeEnd: measurement.endTime }
         : this._viewport && calculateViewportBounds(this._viewport);
-    const logStart = this.apexLog?.timestamp ?? 0;
-    const logEnd = this.apexLog?.exitStamp ?? logStart;
+    const columns = this.logStore?.log.columns;
+    const logStart = columns?.startTimestamp[0] ?? 0;
+    const logEnd = columns?.endTimestamp[0] ?? logStart;
     setRange(span ? windowFor(span.timeStart, span.timeEnd, logStart, logEnd) : null);
   });
 
@@ -397,6 +471,8 @@ export class TimelineFlameChart extends LitElement {
 
     // Destroy renderer
     if (this.apexLogTimeline) {
+      // Before the destroy: the finder would otherwise hold the old chart until the next search.
+      this.finder.forget();
       this.apexLogTimeline.destroy();
       this.apexLogTimeline = null;
     }
@@ -427,7 +503,10 @@ export class TimelineFlameChart extends LitElement {
 
   override render() {
     return html`
-      <div class="timeline-container">
+      <div class="timeline-container ${this.tooSmall ? 'timeline-container--small' : ''}">
+        <div class="too-small" role="status">
+          ${this.tooSmall ? 'Make this pane taller to show the timeline.' : ''}
+        </div>
         ${this.errorMessage ? html`<div class="error-message">${this.errorMessage}</div>` : ''}
       </div>
     `;

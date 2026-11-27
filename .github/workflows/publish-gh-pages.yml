@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          lfs: true
       # The docs come from main, so a text fix ships without a release. The live demo runs
       # the latest stable release, so it never shows viewer code users cannot install yet.
       - name: Find the latest stable release
@@ -44,7 +45,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       # 👇 Build steps
       - name: pnpm setup
-        uses: pnpm/action-setup@v6.1.0
+        uses: pnpm/action-setup@v6.1.1
         with:
           version: 10
       - name: Set up Node
@@ -60,8 +61,14 @@ jobs:
           - name: Download the release
             env:
               TAG: ${{ steps.release.outputs.tag }}
+            # Open VSX can take minutes to serve a version after the publish succeeds.
             run: |
-              url=$(curl -fsS "https://open-vsx.org/api/FinancialForce/lana/$TAG" | jq -er .files.download)
+              for i in $(seq 1 60); do
+                json=$(curl -fsS "https://open-vsx.org/api/FinancialForce/lana/$TAG") && break
+                echo "Open VSX does not serve $TAG yet (try $i of 60)"
+                sleep 30
+              done
+              url=$(jq -er .files.download <<<"$json")
               curl -fsSL -o "$RUNNER_TEMP/lana.vsix" "$url"
               unzip -q "$RUNNER_TEMP/lana.vsix" 'extension/*' -d "$RUNNER_TEMP/release"
               mv "$RUNNER_TEMP/release/extension" "$RUNNER_TEMP/release/lana"

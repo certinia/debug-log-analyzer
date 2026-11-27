@@ -4,11 +4,11 @@
 
 export { max, sum, type Calc, type Calcs } from './calcs.js';
 export type { ExportColumn, ExportOptions } from './export.js';
-export type { CellText, FindQuery, FindResult } from './find.js';
+export type { CellText, FindDirection, FindQuery, FindResult } from './find.js';
 export { navigate, type NavKey } from './navigation.js';
 export type { Scheduler } from './schedule.js';
 export type { Sort, SortBy, SortDirection } from './sort.js';
-export { parentIndex, type RowView } from './rows.js';
+export { expansionOf, parentIndex, type GridExpansion, type RowView } from './rows.js';
 export { GridStore, type Snapshot } from './store.js';
 export {
   Group,

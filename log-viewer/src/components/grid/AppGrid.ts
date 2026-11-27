@@ -65,6 +65,10 @@ const cells = css`
   .progress-bar__text__percent {
     width: 9ch;
   }
+  /* A Used figure that differs from the Seen one: a data-quality caveat. */
+  .reported-differs {
+    background: var(--lana-callout-warning-bg);
+  }
   ${unsafeCSS(soqlSyntaxStyles)}
 
   .soql-group-header {

@@ -34,6 +34,40 @@ export function parentIndex<R>(rows: RowView<R>, index: number): number {
   return -1;
 }
 
+/** Whether some shown row can be opened, and whether some can be closed. */
+export interface GridExpansion {
+  canExpand: boolean;
+  canCollapse: boolean;
+}
+
+/** The row at `index` can be opened, or with `expand` false, closed. */
+const steps = <R>(rows: RowView<R>, index: number, expand: boolean): boolean =>
+  rows.hasChildrenAt(index) && rows.isExpandedAt(index) !== expand;
+
+export function expansionOf<R>(rows: RowView<R>): GridExpansion {
+  const out = { canExpand: false, canCollapse: false };
+  for (let i = 0; i < rows.size && !(out.canExpand && out.canCollapse); i++) {
+    out.canExpand ||= steps(rows, i, true);
+    out.canCollapse ||= steps(rows, i, false);
+  }
+  return out;
+}
+
+/**
+ * The depth one level of expand acts on: the shallowest that has a closed row. For
+ * collapse, the deepest that has an open row. -1 when there is none.
+ */
+export function stepDepth<R>(rows: RowView<R>, expand: boolean): number {
+  let level = -1;
+  for (let i = 0; i < rows.size; i++) {
+    const depth = rows.depthAt(i);
+    if ((level === -1 || (expand ? depth < level : depth > level)) && steps(rows, i, expand)) {
+      level = depth;
+    }
+  }
+  return level;
+}
+
 export class FlatRows<R extends object> implements RowView<R> {
   readonly rows: readonly (R | Group<R>)[];
   readonly depths: Uint16Array;

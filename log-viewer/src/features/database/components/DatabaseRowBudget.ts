@@ -13,10 +13,10 @@ import {
 } from '../../../components/governorCopy.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail, type StackedSegment } from '../../../components/StackedTimeBar.js';
-import { DerivedValue } from '../../../core/log/DerivedValue.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { formatInteger } from '../../../core/utility/Util.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import '../../../components/SectionSkeleton.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';

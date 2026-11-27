@@ -4,10 +4,14 @@
  * @jest-environment jsdom
  */
 import type { ApexLog, GovernorLimits } from '@apexdevtools/apex-log-parser';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
-import { stubStore } from '#test-helpers/apexLog.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { setRange } from '#core/log/rangeScope.js';
+import { WINDOW_UNREADABLE_TEXT } from '#core/log/windowStats.js';
+import { failWindowIndex, stubStore } from '#test-helpers/apexLog.js';
 import { governorLimits, seriesEvent, timeSeries } from '#test-helpers/limits.js';
 
 // The metric strip's series, which the overview always reads its gauges from
@@ -28,8 +32,14 @@ const overview = async () => {
 };
 
 /** No provider in the test, so the consumed store is assigned straight on. */
-const loadLog = async (element: LogOverview, governorLimits: GovernorLimits) => {
-  element.logStore = stubStore({ governorLimits } as unknown as ApexLog);
+const loadLog = async (
+  element: LogOverview,
+  governorLimits: GovernorLimits,
+  levelGap: LogStore['levelGap'] = () => null,
+) => {
+  element.logStore = Object.assign(stubStore({ governorLimits } as unknown as ApexLog), {
+    levelGap,
+  });
   await element.updateComplete;
   // The derived value lands a microtask after the render that asks for it.
   await element.updateComplete;
@@ -39,6 +49,10 @@ describe('log-overview', () => {
   beforeEach(() => {
     document.body.replaceChildren();
     mockSeries = timeSeries();
+  });
+
+  afterEach(() => {
+    setRange(null);
   });
 
   const noLog = governorLimits();
@@ -83,5 +97,30 @@ describe('log-overview', () => {
 
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
     expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('no governor usage');
+  });
+
+  it('names the level that would record governor usage when the log was captured below it', async () => {
+    const element = await overview();
+    const gap = findLevelGap('limits', { apexProfiling: 'NONE' }, { apexProfiling: 'NONE' });
+    await loadLog(element, noLog, () => gap);
+
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toBe(describeLevelGap(gap));
+  });
+
+  // It showed the whole log's gauges under a window it could not count.
+  it('says it cannot count a window whose log it cannot read', async () => {
+    const element = await overview();
+    mockSeries = seriesWithSoql(100);
+    await loadLog(element, noLog);
+    // The stub has no index to build from, so this only states what the test needs.
+    failWindowIndex(element.logStore!);
+
+    setRange({ start: 0, end: 500 });
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toBe(WINDOW_UNREADABLE_TEXT);
   });
 });

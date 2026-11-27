@@ -11,7 +11,7 @@
  *
  * https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_gov_limits.htm
  */
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../core/metrics/eventMetrics.js';
+import { SOSL_ROWS_PER_QUERY_LIMIT } from '#core/metrics/eventMetrics.js';
 
 // Re-exported so the Database tab's own consumers keep one import for its numbers.
 export { SOSL_ROWS_PER_QUERY_LIMIT };

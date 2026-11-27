@@ -1,9 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, CodeUnitStartedLine } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, EventOf } from '@apexdevtools/apex-log-parser';
 
-import { formatDuration, formatWallClockTime } from '../../core/utility/Util.js';
+import { formatDuration, formatWallClockTime } from '#core/utility/Util.js';
+
+type CodeUnit = EventOf<'CODE_UNIT_STARTED'>;
 
 /**
  * One header identity item: `label` is the compact display text, `detail` the tooltip, and
@@ -39,7 +41,7 @@ export function deriveLogIdentity(log: ApexLog): LogIdentityData {
 
 const MAX_LISTED_ENTRY_POINTS = 5;
 
-function entryPointItem(units: CodeUnitStartedLine[]): LogIdentityItem | null {
+function entryPointItem(units: readonly CodeUnit[]): LogIdentityItem | null {
   // Not log order: the first can be a short platform step, e.g. `FutureHandler - state load`.
   const ranked = units.toSorted((a, b) => b.duration.total - a.duration.total);
   const [longest] = ranked;
@@ -48,7 +50,7 @@ function entryPointItem(units: CodeUnitStartedLine[]): LogIdentityItem | null {
   }
   const label = entryPointLabel(longest);
   if (ranked.length === 1) {
-    return { label, detail: longest.text };
+    return { label, detail: longest.text ?? '' };
   }
   const shown = ranked
     .slice(0, MAX_LISTED_ENTRY_POINTS)
@@ -64,12 +66,12 @@ function entryPointItem(units: CodeUnitStartedLine[]): LogIdentityItem | null {
   };
 }
 
-function entryPointLabel(unit: CodeUnitStartedLine): string {
-  const text = unit.text;
+function entryPointLabel(unit: CodeUnit): string {
+  const text = unit.text ?? '';
   if (text === 'execute_anonymous_apex') {
     return 'Anonymous Apex';
   }
-  switch (unit.codeUnitType) {
+  switch (unit.details.codeUnitType) {
     case 'VF':
       return `VF ${text.slice(text.lastIndexOf('/') + 1)}`;
     case '__sfdc_trigger': {

@@ -26,7 +26,7 @@ import {
 } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { selfTimeByCategory } from '../../log-viewer/src/features/timeline/utils/category-self-time.js';
 import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
-import { heapMb, line, nowMs, time } from './harness.js';
+import { heapMb, line, nowMs, print, time, yieldSlice } from './harness.js';
 
 /** A word nearly every log holds many times, so the search walks and matches a lot. */
 const SEARCH_TEXT = 'method';
@@ -42,9 +42,6 @@ const WINDOWS = [WHOLE_LOG, { from: 0.5, share: 0.1 }, { from: 0.3, share: 0.001
 
 const DISPLAY_WIDTH = 1600;
 
-// Resolving at once measures the index build's work rather than the frames it would yield.
-const yieldSlice = () => Promise.resolve();
-
 /** Everything the timeline builds before its first frame, in the order its init builds it. */
 async function build(log: ApexLog) {
   // Its own store, so a second build in one run is not answered from the first one's cache.
@@ -55,11 +52,11 @@ async function build(log: ApexLog) {
   ]);
   selfTimeByCategory(index);
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
-  const frames = buildTimelineFrames(index, categories, log.exitStamp);
-  const cache = new RectangleCache(log.children, categories, frames);
+  const frames = buildTimelineFrames(index, categories, log.columns.endTimestamp[0]!);
+  const cache = new RectangleCache(frames);
   new TreeNavigator(frames);
   const matcher = new EventMatcher<EventNode>(frames);
-  return { frames, cache, matcher };
+  return { index, frames, cache, matcher };
 }
 
 function viewportFor(
@@ -79,22 +76,25 @@ function viewportFor(
 
 /** A CSV of what the timeline holds and draws, so two revisions can be diffed. */
 export async function digestTimeline(log: ApexLog): Promise<void> {
-  const { frames, cache } = await build(log);
-  const { maxDepth, totalDuration, rectsByDepth } = frames;
+  const { index, frames, cache } = await build(log);
+  const { maxDepth, totalDuration, rectRowsByDepth } = frames;
 
-  console.log('section,key,a,b,c,d');
-  console.log(`total,,${maxDepth},${totalDuration},,`);
-  const depths = [...rectsByDepth.keys()].sort((a, b) => a - b);
-  for (const depth of depths) {
-    const rects = rectsByDepth.get(depth)!;
+  print('section,key,a,b,c,d');
+  print(`total,,${maxDepth},${totalDuration},,`);
+  rectRowsByDepth.forEach((byStart, depth) => {
+    if (!byStart.length) {
+      return;
+    }
+    // Summed in row order, so the float sums match revisions that kept rects in pre-order.
+    const rows = [...byStart].sort((a, b) => a - b);
     let start = 0;
     let self = 0;
-    for (const rect of rects) {
-      start += rect.timeStart;
-      self += rect.selfDuration;
+    for (const row of rows) {
+      start += frames.start[row]!;
+      self += index.self[row]!;
     }
-    console.log(`depth,${depth},${rects.length},${start},${self},`);
-  }
+    print(`depth,${depth},${rows.length},${start},${self},`);
+  });
 
   for (const window of WINDOWS) {
     const culled = cache.getCulledRectangles(viewportFor(totalDuration, maxDepth, window), COLORS);
@@ -108,7 +108,7 @@ export async function digestTimeline(log: ApexLog): Promise<void> {
         events += bucket.eventCount;
         colors += bucket.color;
       }
-      console.log(`cull,${key}:${category},${rects.length},${buckets.length},${events},${colors}`);
+      print(`cull,${key}:${category},${rects.length},${buckets.length},${events},${colors}`);
     }
   }
 }
@@ -117,16 +117,13 @@ export async function measureTimeline(log: ApexLog): Promise<void> {
   const before = heapMb();
   const { frames, cache, matcher } = await time('build to first frame', () => build(log));
   line('heap after build', `${heapMb() - before}MB`);
-  let rects = 0;
-  for (const each of frames.rectsByCategory.values()) {
-    rects += each.length;
-  }
+  const rects = frames.rectRowsByDepth.reduce((sum, rows) => sum + rows.length, 0);
   line('frames', `${rects}, maxDepth ${frames.maxDepth}`);
 
   const search = await time(`search "${SEARCH_TEXT}"`, () =>
     matcher.search(textPredicate(SEARCH_TEXT)),
   );
-  line('matches', String(search.total));
+  line('matches', String(search?.total));
 
   // The whole log in view is the worst cull: every depth, most of it bucketed.
   const viewport = viewportFor(frames.totalDuration, frames.maxDepth, WHOLE_LOG);

@@ -2,9 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { EVENT_METRICS, HEAP_PEAK } from '../../../core/metrics/eventMetrics.js';
+import { EVENT_METRICS, HEAP_PEAK } from '#core/metrics/eventMetrics.js';
 
 import {
   frameCard,
@@ -34,21 +34,21 @@ const logTotals = {
   heapPeak: 6_000_000,
 };
 
-const apexLog = { startTime: null, timestamp: 0, ...logTotals } as unknown as ApexLog;
+const columns = { startTimestamp: [0] };
+const apexLog = { startTime: null, columns, ...logTotals } as unknown as ApexLog;
 
 /** 10:29:24.600 at the first event, so a 1ms frame ends a millisecond later. */
-const withStart = { startTime: 37_764_600, timestamp: 0, ...logTotals } as unknown as ApexLog;
+const withStart = { startTime: 37_764_600, columns, ...logTotals } as unknown as ApexLog;
 
-function event(over: Record<string, unknown> = {}): LogEvent {
+function event(over: Record<string, unknown> = {}): ApexEvent {
   return {
-    isParent: true,
+    isFrame: true,
     type: 'METHOD_ENTRY',
-    category: 'Apex',
     text: 'MyClass.myMethod()',
-    namespace: '',
+    namespace: null,
     lineNumber: null,
-    timestamp: 0,
-    exitStamp: 1_000_000,
+    startTimestamp: 0,
+    endTimestamp: 1_000_000,
     duration: { total: 1_000_000, self: 400_000 },
     soqlCount: { total: 0, self: 0 },
     soqlRowCount: { total: 0, self: 0 },
@@ -61,7 +61,7 @@ function event(over: Record<string, unknown> = {}): LogEvent {
     heapGross: { total: 0, self: 0 },
     heapPeak: 0,
     ...over,
-  } as unknown as LogEvent;
+  } as unknown as ApexEvent;
 }
 
 function card(over: Record<string, unknown> = {}): TooltipCard {
@@ -112,11 +112,12 @@ describe('frameCard', () => {
    * into the reading beside it. Common on database frames, so it has to fit.
    */
   it('names free time in the label', () => {
-    expect(row(card({ cpuType: 'free' }), 'Time · free')?.value).toBe('1 ms');
+    // Salesforce charges no CPU for a query's own time.
+    expect(row(card({ type: 'SOQL_EXECUTE_BEGIN' }), 'Time · free')?.value).toBe('1 ms');
   });
 
-  it('has no timing row for a frame that never exited', () => {
-    expect(row(card({ exitStamp: undefined }), 'Time')).toBeUndefined();
+  it('has no timing row for a leaf, which spans no time', () => {
+    expect(row(card({ isFrame: false }), 'Time')).toBeUndefined();
   });
 
   /** The line is the call site in the containing code, so it reads as where the call

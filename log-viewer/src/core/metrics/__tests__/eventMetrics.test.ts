@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { EVENT_METRICS, formatBytes, HEAP_PEAK, usageParts } from '../eventMetrics.js';
 
@@ -95,7 +95,7 @@ describe('EVENT_METRICS', () => {
 
 describe('HEAP_PEAK', () => {
   it('measures against the heap governor limit', () => {
-    expect(HEAP_PEAK.pick({ heapPeak: 4_000_000 } as LogEvent)).toBe(4_000_000);
+    expect(HEAP_PEAK.pick({ heapPeak: 4_000_000 } as ApexEvent)).toBe(4_000_000);
     expect(HEAP_PEAK.limit(limits)).toBe(6_000_000);
   });
 });

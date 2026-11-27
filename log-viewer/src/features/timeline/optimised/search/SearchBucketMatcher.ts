@@ -13,7 +13,7 @@
  */
 
 import type { PixelBucket } from '../../types/flamechart.types.js';
-import type { MatchedEventInfo } from '../../types/search.types.js';
+import type { MatchSpan } from '../../types/search.types.js';
 import {
   type BatchColorInfo,
   UNKNOWN_CATEGORY_COLOR,
@@ -21,53 +21,62 @@ import {
 } from '../BucketColorResolver.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 
+// One depth's matches, ascending by start: a match's start and category share an index.
+interface DepthMatches {
+  readonly starts: Float64Array;
+  readonly categories: readonly string[];
+}
+
 /**
  * Spatial index of matched events grouped by depth, each depth ordered by timestamp.
  */
-export type MatchesByDepth = Map<number, ReadonlyArray<MatchedEventInfo>>;
+export type MatchesByDepth = Map<number, DepthMatches>;
 
 /** The renderer asks on every frame; `SearchCursorImpl` answers with the same array each time. */
-const indexCache = new WeakMap<ReadonlyArray<MatchedEventInfo>, MatchesByDepth>();
+const indexCache = new WeakMap<ReadonlyArray<MatchSpan>, MatchesByDepth>();
 
 /**
  * Build a spatial index of matched events grouped by tree depth.
  *
- * @param matchedEventsInfo - Lightweight info about matched events
- * @returns Map from depth to array of matched event positions
+ * @param spans - Where each matched frame sits
+ * @returns Map from depth to its matches, ascending by start
  */
-export function buildMatchIndex(
-  matchedEventsInfo: ReadonlyArray<MatchedEventInfo>,
-): MatchesByDepth {
-  const cached = indexCache.get(matchedEventsInfo);
+export function buildMatchIndex(spans: ReadonlyArray<MatchSpan>): MatchesByDepth {
+  const cached = indexCache.get(spans);
   if (cached) {
     return cached;
   }
 
-  const matchesByDepth = new Map<number, MatchedEventInfo[]>();
-  for (const info of matchedEventsInfo) {
-    let depthMatches = matchesByDepth.get(info.depth);
-    if (!depthMatches) {
-      depthMatches = [];
-      matchesByDepth.set(info.depth, depthMatches);
+  const spansByDepth = new Map<number, MatchSpan[]>();
+  for (const span of spans) {
+    let depthSpans = spansByDepth.get(span.depth);
+    if (!depthSpans) {
+      depthSpans = [];
+      spansByDepth.set(span.depth, depthSpans);
     }
-    depthMatches.push(info);
+    depthSpans.push(span);
   }
 
-  for (const depthMatches of matchesByDepth.values()) {
-    depthMatches.sort((a, b) => a.timestamp - b.timestamp);
+  const matchesByDepth: MatchesByDepth = new Map();
+  for (const [depth, depthSpans] of spansByDepth) {
+    depthSpans.sort((a, b) => a.timeStart - b.timeStart);
+    matchesByDepth.set(depth, {
+      starts: Float64Array.from(depthSpans, (span) => span.timeStart),
+      categories: depthSpans.map((span) => span.category),
+    });
   }
 
-  indexCache.set(matchedEventsInfo, matchesByDepth);
+  indexCache.set(spans, matchesByDepth);
   return matchesByDepth;
 }
 
-function firstAtOrAfter(matches: ReadonlyArray<MatchedEventInfo>, time: number): number {
+function firstAtOrAfter(starts: Float64Array, time: number): number {
   let low = 0;
-  let high = matches.length;
+  let high = starts.length;
   while (low < high) {
     const mid = (low + high) >>> 1;
-    const match = matches[mid];
-    if (match && match.timestamp < time) {
+    // mid < high <= starts.length
+    if (starts[mid]! < time) {
       low = mid + 1;
     } else {
       high = mid;
@@ -87,7 +96,7 @@ function firstAtOrAfter(matches: ReadonlyArray<MatchedEventInfo>, time: number):
  * the first match is taken as the winner to beat.
  */
 export function resolveBucketSearchColor(
-  bucket: Pick<PixelBucket, 'depth' | 'timeStart' | 'timeEnd' | 'color'>,
+  bucket: Pick<PixelBucket, 'depth' | 'firstStart' | 'lastStart' | 'color'>,
   matchIndex: MatchesByDepth,
   batchColors: Map<string, BatchColorInfo>,
 ): number {
@@ -100,17 +109,19 @@ export function resolveBucketSearchColor(
   let winningPriority = Infinity;
   let matched = false;
 
-  for (let i = firstAtOrAfter(depthMatches, bucket.timeStart); i < depthMatches.length; i++) {
-    const match = depthMatches[i];
-    if (!match || match.timestamp >= bucket.timeEnd) {
+  const { starts, categories } = depthMatches;
+  for (let i = firstAtOrAfter(starts, bucket.firstStart); i < starts.length; i++) {
+    // i < starts.length, and categories has the same length
+    if (starts[i]! > bucket.lastStart) {
       break;
     }
-    if (!match.category) {
+    const category = categories[i]!;
+    if (!category) {
       continue;
     }
-    const priority = categoryPriority(match.category);
+    const priority = categoryPriority(category);
     if (!matched || priority < winningPriority) {
-      winner = match.category;
+      winner = category;
       winningPriority = priority;
     }
     matched = true;

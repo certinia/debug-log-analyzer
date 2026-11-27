@@ -3,7 +3,7 @@
  */
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
-import type { DetailSource } from '../core/events/EventBus.js';
+import type { DetailSource } from '#core/events/EventBus.js';
 import { InspectorEmphasis } from './inspectorEmphasis.js';
 import { wireInspectorTab, type InspectorTabSync } from './inspectorTab.js';
 

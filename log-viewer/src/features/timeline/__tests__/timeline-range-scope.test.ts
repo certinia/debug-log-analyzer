@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import type { LogStore } from '#core/log/LogStore.js';
 
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import type { TimelineOptions, ViewportState } from '../types/flamechart.types.js';
@@ -16,7 +16,8 @@ let reported: TimelineOptions = {};
 // drives only what the chart publishes from the renderer's reports.
 jest.mock('../optimised/ApexLogTimeline.js', () => ({
   ApexLogTimeline: class {
-    init(_container: HTMLElement, _log: ApexLog, options: TimelineOptions): Promise<void> {
+    findTarget = { find: async () => null, setCurrentMatch: async () => {}, clearFind: () => {} };
+    init(_container: HTMLElement, _log: LogStore, options: TimelineOptions): Promise<void> {
       reported = options;
       return Promise.resolve();
     }
@@ -26,12 +27,14 @@ jest.mock('../optimised/ApexLogTimeline.js', () => ({
   },
 }));
 
-import { currentRange, setRange } from '../../../core/log/rangeScope.js';
+import { currentRange, setRange } from '#core/log/rangeScope.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { AlwaysVisible, settle } from '#test-helpers/visibility.js';
 import '../components/TimelineFlameChart.js';
 
-const LOG = { timestamp: 0, exitStamp: 1000, duration: { total: 1000 } } as unknown as ApexLog;
+const LOG = {
+  log: { columns: { startTimestamp: [0], endTimestamp: [1000] }, duration: { total: 1000 } },
+} as unknown as LogStore;
 
 const viewport = (start: number, end: number): ViewportState =>
   makeViewport({ offsetX: start, displayWidth: end - start });
@@ -44,7 +47,7 @@ const measurement = (startTime: number, endTime: number): MeasurementSnapshot =>
 
 async function mount(): Promise<void> {
   const element = document.createElement('timeline-flame-chart');
-  Object.assign(element, { apexLog: LOG });
+  Object.assign(element, { logStore: LOG });
   document.body.append(element);
   await (element as unknown as { updateComplete: Promise<boolean> }).updateComplete;
   await settle();

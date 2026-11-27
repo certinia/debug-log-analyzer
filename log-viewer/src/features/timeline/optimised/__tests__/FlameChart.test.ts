@@ -11,7 +11,7 @@ import { makeViewport } from '#test-helpers/viewport.js';
 import { FlameChart } from '../FlameChart.js';
 import { TimelineViewport } from '../TimelineViewport.js';
 
-const HIT_NODE = { id: '0-0', timestamp: 0, duration: 10, depth: 0, original: { eventIndex: 1 } };
+const HIT_NODE = { id: '0-0', timestamp: 0, duration: 10, depth: 0, original: { eventId: 1 } };
 
 /** The private collaborators `resize` and one `render()` need to reach the wash, and nothing else. */
 function stubbedChart({ displayHeight = 300, culling = false } = {}): {
@@ -320,5 +320,23 @@ describe('FlameChart.setViewport', () => {
     chart.setViewport({ ...before, zoom: before.zoom * 4, offsetX: 1e9 });
 
     expect(chart.getViewport()!.offsetX).toBeLessThan(1e9);
+  });
+});
+
+describe('Escape in the chart', () => {
+  it('hands the search to the find that owns it, which closes the widget', () => {
+    const chart = new FlameChart();
+    const onSearchClear = jest.fn();
+    const container = document.createElement('div');
+    const internals = chart as unknown as Record<string, unknown>;
+    internals['container'] = container;
+    internals['viewport'] = new TimelineViewport(400, 300, 1e9, 5);
+    internals['app'] = { canvas: document.createElement('canvas') };
+    internals['callbacks'] = { onSearchClear };
+    (internals['setupKeyboardHandler'] as () => void).call(chart);
+
+    container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(onSearchClear).toHaveBeenCalledTimes(1);
   });
 });
