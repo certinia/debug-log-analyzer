@@ -176,7 +176,7 @@ describe('FindWidget', () => {
       void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ...init }));
     const click = (name: string): void =>
       void view.widget.renderRoot
-        .querySelector(`[title="${name}"]`)
+        .querySelector(`[label="${name}"]`)
         ?.dispatchEvent(new MouseEvent('click'));
     return { ...view, type, press, click };
   }

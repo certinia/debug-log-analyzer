@@ -34,6 +34,7 @@ import { LogLevelsController } from './LogLevelsController.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
 import { toLogIssues } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
+import { TooltipController } from './TooltipController.js';
 
 // styles
 import { globalStyles, srOnly } from '../../styles/global.styles.js';
@@ -99,6 +100,8 @@ export class LogViewer extends LitElement {
 
   @state()
   private _navigateRequest: TimelineNavigateRequest | undefined = undefined;
+
+  private readonly _tooltips = new TooltipController(this);
 
   private readonly _levels = new LogLevelsController(this, {
     publish: (store) => (this._logStore = setCurrentLog(store)),

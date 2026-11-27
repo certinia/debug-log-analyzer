@@ -12,7 +12,7 @@ export class VsIconCheckbox extends LitElement {
   @property() icon = '';
   @property() showSelected = false;
   @property() checked = false;
-  @property() title = '';
+  @property() label = '';
 
   static styles = [
     globalStyles,
@@ -29,8 +29,8 @@ export class VsIconCheckbox extends LitElement {
       icon="${this.icon}"
       ?toggleable="${this.showSelected}"
       ?checked="${this.checked && this.showSelected}"
-      label="${this.title}"
-      title="${this.title}"
+      label="${this.label}"
+      title="${this.label}"
       @click="${this._toggleChecked}"
     ></vscode-toolbar-button>`;
   }
