@@ -5649,11 +5649,11 @@ packages:
   fast-uri@3.1.9:
     resolution: {integrity: sha512-hS/0Wt3Ya043oKXs0sIxrMpKQITXhMLIrVAKKXi4gozGC9v7YRWVnXIZzjNPTO02M9BdxLCWqK1yRXgNziVyJQ==}
 
-  fast-xml-builder@1.3.1:
-    resolution: {integrity: sha512-pIM/1n3ntFXKYrUZwW7QCK0gAW7XY+wzj1YMIV3tLDvPj/V+zTGJK5e3/4WJfwj0qWw2ElNXiTixda/R+3YSug==}
+  fast-xml-builder@1.3.2:
+    resolution: {integrity: sha512-OX91VSlShLPDgRZV7tk/YQ4l8tT75QziF5Ixg8g4PFbCVPjuTWwN+yQfAxLJ0dufJpprdOd6HlM74Jhd39TcBQ==}
 
-  fast-xml-parser@5.11.2:
-    resolution: {integrity: sha512-R9iDuNrQYeQut46cn2r2wHKn4HYzVDvDm5J1wW+koZewykv0yuO2HChTYeZtrULyHIDM9cj9TUXloCsueCQUog==}
+  fast-xml-parser@5.12.1:
+    resolution: {integrity: sha512-wR8dO/fx+z8C5exuem1e7BKOWvjsuzvjS/tvA/Xu3Z1zQqJGcXrPzXbcAiaMgp2KjreEROcTkmnnisrcmJ2hYQ==}
     hasBin: true
 
   fastest-levenshtein@1.0.16:
@@ -6366,8 +6366,8 @@ packages:
     resolution: {integrity: sha512-mE00Gnza5EEB3Ds0HfMyllZzbBrmLOX3vfWoj9A9PEnTfratQ/BcaJOuMhnkhjXvb2+FkY3VuHqtAGpTPmglFQ==}
     engines: {node: '>=18'}
 
-  is-unsafe@2.0.2:
-    resolution: {integrity: sha512-HgbIHPBH0KHHCcjLfGsCvhtPTVxjaAZlXjwdz7/GQC40SjSe4sfQsar8J5VFo8JOSbarkpV0OLG95bbaNd9aAQ==}
+  is-unsafe@2.0.3:
+    resolution: {integrity: sha512-ZBllczCCO267vgdFb6Tq3pv+LhHaCiGMdr+ZsuL+OopruAg7S+3ZDs1vD0RPC0uSrkjzbraxaGjtX1YBxjPeFQ==}
 
   is-wsl@2.2.0:
     resolution: {integrity: sha512-fKzAra0rGJUUBwGBgNkHZuToZcn+TtXHpeCgmkMJMMYx1sQDYaCSyjJBSCa2nH1DGm7s3n1oBnohoVTBaN7Lww==}
@@ -13624,7 +13624,7 @@ snapshots:
       '@salesforce/ts-types': 3.2.3
       '@salesforce/types': 1.9.0
       fast-levenshtein: 3.0.0
-      fast-xml-parser: 5.11.2
+      fast-xml-parser: 5.12.1
       got: 11.8.6
       graceful-fs: 4.2.11
       ignore: 5.3.2
@@ -13642,7 +13642,7 @@ snapshots:
       '@salesforce/kit': 4.0.8
       '@salesforce/source-deploy-retrieve': 13.8.0(supports-color@10.2.2)
       '@salesforce/ts-types': 3.2.3
-      fast-xml-parser: 5.11.2
+      fast-xml-parser: 5.12.1
       graceful-fs: 4.2.11
       isomorphic-git: 1.44.5
       ts-retry-promise: 0.8.1
@@ -16065,16 +16065,16 @@ snapshots:
 
   fast-uri@3.1.9: {}
 
-  fast-xml-builder@1.3.1:
+  fast-xml-builder@1.3.2:
     dependencies:
       path-expression-matcher: 1.6.2
       xml-naming: 0.3.0
 
-  fast-xml-parser@5.11.2:
+  fast-xml-parser@5.12.1:
     dependencies:
       '@nodable/entities': 3.1.0
-      fast-xml-builder: 1.3.1
-      is-unsafe: 2.0.2
+      fast-xml-builder: 1.3.2
+      is-unsafe: 2.0.3
       path-expression-matcher: 1.6.2
       strnum: 2.5.1
       xml-naming: 0.3.0
@@ -16893,7 +16893,7 @@ snapshots:
 
   is-unicode-supported@2.1.0: {}
 
-  is-unsafe@2.0.2: {}
+  is-unsafe@2.0.3: {}
 
   is-wsl@2.2.0:
     dependencies:
