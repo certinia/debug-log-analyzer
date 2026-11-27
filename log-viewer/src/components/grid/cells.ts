@@ -19,26 +19,15 @@ export interface BarOptions {
 export function bar(value: number, total: number, options: BarOptions = {}): TemplateResult {
   const { precision = 2, percent = true } = options;
   const share = sharePercent(value, total);
+  const barWidth = value > 0 && total > 0 ? Math.max(share, MIN_VISIBLE_PERCENT) : 0;
   // `data-grid-find-text` is the grid's FIND_TEXT_ATTR: find marks the value, not the percent.
-  return html`<div class="progress-wrapper">
-    ${
-      value > 0 && total > 0
-        ? html`<div
-            class="progress-bar"
-            style="width: ${Math.max(share, MIN_VISIBLE_PERCENT)}%"
-          ></div>`
+  return html`<div class="progress-wrapper" style="background-size: ${barWidth}% 100%"
+    ><span data-grid-find-text>${(value || 0).toFixed(precision)}</span>${
+      percent
+        ? html`<span class="progress-bar__text__percent">(${Math.round(share).toFixed(2)}%)</span>`
         : nothing
-    }
-    <div class="progress-bar__text">
-      <span data-grid-find-text>${(value || 0).toFixed(precision)}</span>${
-        percent
-          ? html`<span class="progress-bar__text__percent"
-              >(${Math.round(share).toFixed(2)}%)</span
-            >`
-          : nothing
-      }
-    </div>
-  </div>`;
+    }</div
+  >`;
 }
 
 /** Nanoseconds as milliseconds, with a bar for their share of `totalNs`. */

@@ -183,6 +183,10 @@
      rows with no data hue of their own; length is always the magnitude. */
   --lana-meter-fill: color-mix(in srgb, var(--vscode-foreground, #cccccc) 55%, transparent);
 
+  /* Grid bars — a value's share of its column, behind the number. Orange, so it stays
+     distinct from the blue selected row. */
+  --lana-grid-bar-fill: color-mix(in srgb, var(--vscode-charts-orange, #a97d0f) 30%, transparent);
+
   /* Warning callout — a tinted fill behind an actionable data-quality caveat. */
   --lana-callout-warning-bg: color-mix(in srgb, var(--lana-severity-warning) 12%, transparent);
   --lana-callout-warning-bg-hover: color-mix(

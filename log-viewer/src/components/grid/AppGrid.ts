@@ -44,25 +44,15 @@ const theme = css`
 
 /** What the app's cells draw: bars, queries and their group headers. */
 const cells = css`
+  /* The bar, sized by the inline background-size that bar() in cells.ts sets. */
   .progress-wrapper {
-    position: relative;
     font-variant-numeric: tabular-nums;
-  }
-  .progress-bar {
-    position: absolute;
-    height: 100%;
-    opacity: 0.3;
-    right: 0;
-    /* charts.orange keeps the bar distinct from the blue selected row; the literal is
-       the pre-token colour, for hosts that inject no \`--vscode-*\`. */
-    background: var(--vscode-charts-orange, #a97d0f);
-  }
-  .progress-bar__text {
-    position: relative;
-    white-space: pre;
-    display: inline-flex;
+    white-space: nowrap;
+    background: linear-gradient(var(--lana-grid-bar-fill), var(--lana-grid-bar-fill)) right / 0 100%
+      no-repeat;
   }
   .progress-bar__text__percent {
+    display: inline-block;
     width: 9ch;
   }
   /* A Used figure that differs from the Seen one: a data-quality caveat. */
