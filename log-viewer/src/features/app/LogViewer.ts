@@ -10,18 +10,25 @@ import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-t
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { parse } from '@apexdevtools/apex-log-parser';
+import { parse, type LogSource } from '@apexdevtools/apex-log-parser';
 import type { LogLevelsChange } from '../../components/LogLevels.js';
-import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
-import { waitForNextFrame } from '../../core/utility/FrameBudget.js';
-import { logContext } from '../../core/log/logContext.js';
-import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
-import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
+import { TAB_TO_SOURCE } from '#core/events/EventBus.js';
+import { DomListenerController } from '#core/events/DomListenerController.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
+import { logContext } from '#core/log/logContext.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
+import { logStoreFor, setCurrentLog, type LogStore } from '#core/log/LogStore.js';
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
-} from '../../core/messaging/VSCodeExtensionMessenger.js';
+} from '#core/messaging/VSCodeExtensionMessenger.js';
 import type { LogIssue } from '../notifications/types.js';
+import {
+  TIMELINE_GO_TO_EVENT,
+  type TimelineNavigateRequest,
+  type TimelineNavigationEventMap,
+} from '../timeline/navigation.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
 import { LogLevelsController } from './LogLevelsController.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
@@ -30,19 +37,25 @@ import { parserIssuesToNotifications } from './parserNotifications.js';
 import { TooltipController } from './TooltipController.js';
 
 // styles
-import { globalStyles } from '../../styles/global.styles.js';
+import { globalStyles, srOnly } from '../../styles/global.styles.js';
+import { liveStatus } from '../../components/liveStatus.js';
 
 // web components
 import './AppHeader.js';
 import '../../components/LogInspector.js';
 
 interface NavigateToTimelinePayload {
-  timestamp: number;
+  eventId: number;
 }
 
-// Tab ids in display order; vscode-tabs is index based so this maps
-// index <-> id for the string-id based 'show-tab' events used app-wide.
-const TAB_IDS = ['timeline-tab', 'tree-tab', 'analysis-tab', 'database-tab'];
+/** In tab-strip and panel order: `vscode-tabs` is index based, and `show-tab` events use the id. */
+const TABS = [
+  { id: 'timeline-tab', icon: 'graph', label: 'Timeline' },
+  { id: 'tree-tab', icon: 'list-tree', label: 'Call Tree' },
+  { id: 'analysis-tab', icon: 'code', label: 'Analysis' },
+  { id: 'database-tab', icon: 'database', label: 'Database' },
+];
+const TAB_IDS = TABS.map((tab) => tab.id);
 
 /** Every placeholder is `aria-hidden`, so this is the only telling. */
 const LOAD_ANNOUNCEMENT: Record<LogStatus, string> = {
@@ -86,15 +99,12 @@ export class LogViewer extends LitElement {
   _selectedIndex = 0;
 
   @state()
-  private _navigateToEventIndex: number | undefined = undefined;
-
-  @state()
-  private _navigateToTimestamp: number | undefined = undefined;
+  private _navigateRequest: TimelineNavigateRequest | undefined = undefined;
 
   private readonly _tooltips = new TooltipController(this);
 
   private readonly _levels = new LogLevelsController(this, {
-    publish: (log) => (this._logStore = setCurrentLog(log)),
+    publish: (store) => (this._logStore = setCurrentLog(store)),
     fail: (err) =>
       (this.notifications = [
         ...this.notifications,
@@ -118,8 +128,15 @@ export class LogViewer extends LitElement {
            log-levels row) can detect overflow rather than widening the page.
            clip (not hidden) avoids forcing overflow-y to auto. */
         overflow-x: clip;
-        /* Half of the x=16 guide the header and tabs share (see AppHeader). */
-        padding: 0 var(--lana-space-sm);
+      }
+
+      /* Half of the x=16 guide the header and tabs share (see AppHeader). Not on the
+         host, so the inspector reaches the window edge. */
+      app-header {
+        margin: 0 var(--lana-space-sm);
+      }
+      log-inspector {
+        --dock-main-inset: var(--lana-space-sm);
       }
 
       vscode-tabs {
@@ -132,6 +149,7 @@ export class LogViewer extends LitElement {
         flex: 1 1 auto;
         min-width: 0;
         min-height: 0;
+        container-type: inline-size;
       }
 
       vscode-tab-panel {
@@ -156,6 +174,14 @@ export class LogViewer extends LitElement {
         font-size: var(--lana-text-lg);
         text-transform: none;
       }
+
+      /* Too narrow for the TABS labels (about 23rem for four): icons only. Re-check on a new tab. The
+         label stays the tab's accessible name. */
+      @container (max-width: 25rem) {
+        vscode-tab-header .tab-label {
+          ${srOnly}
+        }
+      }
     `,
   ];
 
@@ -169,28 +195,32 @@ export class LogViewer extends LitElement {
         throw err;
       });
 
-    document.addEventListener('show-tab', (e: Event) => {
-      this._showTabEvent(e);
+    new DomListenerController<
+      TimelineNavigationEventMap & { 'show-tab': CustomEvent<{ tabid: string }> }
+    >(this, document, {
+      'show-tab': (e) => this._showTabEvent(e),
+      [TIMELINE_GO_TO_EVENT]: (e) => this._goToTimelineEvent(e.detail.eventId),
     });
+    new SubscriptionController(this, () => [
+      // Escape, when nothing else claims it, deselects on the active tab.
+      installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]),
+      VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
+        const { cmd, payload } = event.data;
+        if (cmd !== 'navigateToTimeline' || payload?.eventId === undefined) {
+          return;
+        }
+        this._goToTimelineEvent(payload.eventId);
+      }),
+    ]);
+  }
 
-    // Escape, when nothing else claims it, deselects on the active tab.
-    installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]);
-
-    // Listen for navigation messages from the extension
-    VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
-      const { cmd, payload } = event.data;
-      if (cmd !== 'navigateToTimeline' || payload?.timestamp === undefined) {
-        return;
-      }
-      this._showTab('timeline-tab');
-      eventBus.emit('timeline:navigate-to', { timestamp: payload.timestamp });
-    });
+  private _goToTimelineEvent(eventId: number): void {
+    this._showTab('timeline-tab');
+    this._navigateRequest = { eventId };
   }
 
   render() {
-    return html`<div class="sr-only" role="status" aria-live="polite">
-        ${this._announced ? LOAD_ANNOUNCEMENT[this._logStatus] : ''}
-      </div>
+    return html`${liveStatus(this._announced ? LOAD_ANNOUNCEMENT[this._logStatus] : '')}
 
       <app-header
         .logName=${this.logName}
@@ -214,24 +244,18 @@ export class LogViewer extends LitElement {
           .selectedIndex="${this._selectedIndex}"
           @vsc-tabs-select="${this._onTabSelect}"
         >
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="graph"></vscode-icon>Timeline</span>
-          </vscode-tab-header>
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="list-tree"></vscode-icon>Call Tree</span>
-          </vscode-tab-header>
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="code"></vscode-icon>Analysis</span>
-          </vscode-tab-header>
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="database"></vscode-icon>Database</span>
-          </vscode-tab-header>
+          ${TABS.map(
+            ({ icon, label }) =>
+              html`<vscode-tab-header slot="header">
+                <span class="tab-header" title=${label}
+                  ><vscode-icon name=${icon}></vscode-icon
+                  ><span class="tab-label">${label}</span></span
+                >
+              </vscode-tab-header>`,
+          )}
 
           <vscode-tab-panel>
-            <timeline-view
-              .navigateToEventIndex="${this._navigateToEventIndex}"
-              .navigateToTimestamp="${this._navigateToTimestamp}"
-            ></timeline-view>
+            <timeline-view .navigateRequest="${this._navigateRequest}"></timeline-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
             <call-tree-view></call-tree-view>
@@ -257,9 +281,8 @@ export class LogViewer extends LitElement {
     }
   }
 
-  _showTabEvent(e: Event) {
-    const tabId = (e as CustomEvent).detail.tabid;
-    this._showTab(tabId);
+  private _showTabEvent(e: CustomEvent<{ tabid: string }>) {
+    this._showTab(e.detail.tabid);
   }
 
   _showTab(tabId: string) {
@@ -286,10 +309,10 @@ export class LogViewer extends LitElement {
     this.logPath = data.logPath?.trim() || '';
 
     const logUri = data.logUri;
-    const read = data.logData
-      ? { logData: data.logData, error: null }
-      : await this._readLog(logUri || '');
-    const logData = read.logData;
+    const read =
+      data.logData !== undefined
+        ? { source: data.logData, error: null }
+        : await this._readLog(logUri || '');
 
     // `parse('')` succeeds, so without this a log that could not be read reports
     // itself as an empty one and every section prints its own "nothing here" line.
@@ -299,13 +322,13 @@ export class LogViewer extends LitElement {
     }
 
     // A throw here rejects `_handleLogFetch`, which the constructor's `catch` publishes.
-    const apexLog = parse(logData);
+    const apexLog = await parse(read.source);
 
     // Published before the views render, so every tab reads the same log
     // whichever one loads first.
-    this._logStore = setCurrentLog(apexLog);
+    this._logStore = setCurrentLog(logStoreFor(apexLog));
     this._logStatus = 'ready';
-    this._levels.open(apexLog);
+    this._levels.open(this._logStore);
 
     this.logSize = apexLog.size;
     this.logDuration = apexLog.duration.total;
@@ -318,10 +341,10 @@ export class LogViewer extends LitElement {
     this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 
     // Navigate to event location if requested (passed as prop to timeline-view)
-    if (data.navigateToEventIndex !== undefined || data.navigateToTimestamp !== undefined) {
+    if (data.navigateToEventId !== undefined) {
       this._showTab('timeline-tab');
-      this._navigateToEventIndex = data.navigateToEventIndex;
-      this._navigateToTimestamp = data.navigateToTimestamp;
+      // An event sent during the parse is newer than the one the fetch carried.
+      this._navigateRequest ??= { eventId: data.navigateToEventId };
     }
   }
 
@@ -344,7 +367,7 @@ export class LogViewer extends LitElement {
    * Reads the log, returning the failure as a {@link LogIssue} rather than publishing it —
    * the caller owns `logProblems` so it can rebuild the list for each load.
    */
-  async _readLog(logUri: string): Promise<{ logData: string; error: LogIssue | null }> {
+  async _readLog(logUri: string): Promise<{ source: LogSource; error: LogIssue | null }> {
     let cause: unknown;
     if (logUri) {
       try {
@@ -352,17 +375,8 @@ export class LogViewer extends LitElement {
         if (!response.ok || !response.body) {
           throw new Error(response.statusText || `Error reading log file: ${response.status}`);
         }
-
-        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-        const chunks: string[] = [];
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-          chunks.push(value);
-        }
-        return { logData: chunks.join(''), error: null };
+        // Bytes, not text: decoding to a string first holds the log twice.
+        return { source: await response.arrayBuffer(), error: null };
       } catch (err: unknown) {
         cause = err;
       }
@@ -370,7 +384,7 @@ export class LogViewer extends LitElement {
       cause = 'Invalid Log Path';
     }
 
-    return { logData: '', error: loadFailure('Could not read log', cause) };
+    return { source: '', error: loadFailure('Could not read log', cause) };
   }
 }
 
@@ -390,7 +404,6 @@ interface LogDataEvent {
   logName?: string;
   logUri?: string;
   logPath?: string;
-  logData?: string;
-  navigateToEventIndex?: number;
-  navigateToTimestamp?: number;
+  logData?: string | Uint8Array;
+  navigateToEventId?: number;
 }

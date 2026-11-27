@@ -5,8 +5,8 @@ import { consume, provide } from '@lit/context';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 /** Gives its children the log as captured, whatever debug levels the header has chosen. */
 @customElement('captured-log-scope')

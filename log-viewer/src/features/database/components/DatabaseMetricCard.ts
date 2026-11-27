@@ -5,9 +5,9 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 const integer = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });

@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
-import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
+import { eventBus, type DetailSource } from '#core/events/EventBus.js';
 import { installEscapeDeselect, isDeselectEscape } from '../escapeDeselect.js';
 
 function escapeEvent(init: KeyboardEventInit = {}): KeyboardEvent {

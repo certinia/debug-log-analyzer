@@ -5,7 +5,7 @@ import '#vscode-elements/vscode-progress-bar.js';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import type { DebugLevels } from '@apexdevtools/apex-log-parser';
+import type { DebugLevels } from '#core/log/levelFilter.js';
 import type { LogIssue } from '../notifications/types.js';
 import type { LogIdentityData } from './logIdentity.js';
 

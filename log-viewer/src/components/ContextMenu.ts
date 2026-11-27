@@ -109,8 +109,14 @@ export class ContextMenu extends LitElement {
         margin: 0 6px;
       }
 
-      .menu-item:hover:not(.disabled) {
+      .menu-item:hover:not(.disabled),
+      .menu-item:focus-visible {
         background-color: var(--lana-row-hover-bg);
+      }
+
+      /* A menu marks its focused row with the row background, as VS Code's do, not a ring. */
+      .menu-item:focus {
+        outline: none;
       }
 
       .menu-item.disabled {
@@ -160,13 +166,22 @@ export class ContextMenu extends LitElement {
   private boundHandleKeyDown = this.handleKeyDown.bind(this);
   /** Re-clamp the open menu when the window/webview resizes so it can't drift off-screen. */
   private boundHandleResize = (): void => this.adjustPosition();
+  /** The button the menu opened from, if any; a press on it toggles rather than reopens. */
+  private _anchor: HTMLElement | null = null;
+  private _returnFocus: HTMLElement | null = null;
 
   /**
-   * Show the context menu at the specified screen coordinates.
+   * Show the context menu at the specified screen coordinates. Pass `anchor` when a
+   * button opens it: a press on that button then closes the menu instead of reopening it.
+   * Focus goes back to what had it, or else the anchor, when the menu closes.
    */
-  public show(items: ContextMenuItem[], x: number, y: number): void {
+  public show(items: ContextMenuItem[], x: number, y: number, anchor?: HTMLElement): void {
+    // While open, focus is in the menu itself, so keep the element recorded at first open.
+    const returnFocus = this._visible ? this._returnFocus : (deepActiveElement() ?? anchor ?? null);
     // Hide any existing menu first
     this.hide();
+    this._anchor = anchor ?? null;
+    this._returnFocus = returnFocus;
 
     this.items = items;
     this.x = x;
@@ -189,9 +204,9 @@ export class ContextMenu extends LitElement {
       // Adjust position if menu goes off-screen (after render)
       void this.updateComplete.then(() => this.adjustPosition());
 
-      // Focus the menu for keyboard navigation
+      // Focus the first row for keyboard navigation
       this.shadowRoot?.querySelector('.menu')?.setAttribute('tabindex', '-1');
-      (this.shadowRoot?.querySelector('.menu') as HTMLElement)?.focus();
+      (this.rows()[0] ?? this.shadowRoot?.querySelector<HTMLElement>('.menu'))?.focus();
     });
   }
 
@@ -207,9 +222,13 @@ export class ContextMenu extends LitElement {
     document.removeEventListener('keydown', this.boundHandleKeyDown, true);
     window.removeEventListener('resize', this.boundHandleResize);
 
+    const returnFocus = this.shadowRoot?.activeElement ? this._returnFocus : null;
+    this._anchor = null;
+    this._returnFocus = null;
     this._visible = false;
     this.removeAttribute('visible');
     this.items = [];
+    returnFocus?.focus();
   }
 
   /**
@@ -219,22 +238,55 @@ export class ContextMenu extends LitElement {
     return this._visible;
   }
 
+  /** Whether the menu is open from `anchor`, so a second press on it should close it. */
+  public isOpenFrom(anchor: HTMLElement): boolean {
+    return this._visible && this._anchor === anchor;
+  }
+
   private handleClickOutside(e: MouseEvent): void {
     // Check if click is outside the menu
     const path = e.composedPath();
-    if (!path.includes(this)) {
+    if (!path.includes(this) && !(this._anchor && path.includes(this._anchor))) {
       this.hide();
       this.dispatchEvent(new CustomEvent('menu-close', { bubbles: true, composed: true }));
     }
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
+    if (e.key === 'Escape' || e.key === 'Tab') {
+      // Tab is left to move on from the opener, as out of any menu.
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       this.hide();
       this.dispatchEvent(new CustomEvent('menu-close', { bubbles: true, composed: true }));
+      return;
     }
+    const rows = this.rows();
+    const at = rows.indexOf(this.shadowRoot?.activeElement as HTMLElement);
+    if ((e.key === 'Enter' || e.key === ' ') && at >= 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      rows[at]?.click();
+      return;
+    }
+    const next = {
+      ArrowDown: (at + 1) % rows.length,
+      ArrowUp: (Math.max(at, 0) - 1 + rows.length) % rows.length,
+      Home: 0,
+      End: rows.length - 1,
+    }[e.key];
+    if (next !== undefined) {
+      e.preventDefault();
+      e.stopPropagation();
+      rows[next]?.focus();
+    }
+  }
+
+  /** The rows a key can move to: every item but separators and disabled ones. */
+  private rows(): HTMLElement[] {
+    return [...(this.shadowRoot?.querySelectorAll<HTMLElement>('.menu-item:not(.disabled)') ?? [])];
   }
 
   private handleItemClick(item: ContextMenuItem): void {
@@ -320,8 +372,10 @@ export class ContextMenu extends LitElement {
     return html`
       <div
         class="menu-item ${item.disabled ? 'disabled' : ''}"
-        role="menuitem"
+        role=${item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+        aria-checked=${item.checked === undefined ? nothing : String(item.checked)}
         aria-disabled="${item.disabled ? 'true' : 'false'}"
+        tabindex="-1"
         data-id="${item.id}"
         @click="${() => this.handleItemClick(item)}"
       >
@@ -331,6 +385,7 @@ export class ContextMenu extends LitElement {
                 type="checkbox"
                 class="vs-checkbox"
                 tabindex="-1"
+                aria-hidden="true"
                 .checked="${item.checked}"
               />`
             : nothing
@@ -352,6 +407,15 @@ export class ContextMenu extends LitElement {
       </div>
     `;
   }
+}
+
+/** The focused element, looked for inside open shadow roots. */
+function deepActiveElement(): HTMLElement | null {
+  let el = document.activeElement;
+  while (el?.shadowRoot?.activeElement) {
+    el = el.shadowRoot.activeElement;
+  }
+  return el instanceof HTMLElement && el !== document.body ? el : null;
 }
 
 declare global {

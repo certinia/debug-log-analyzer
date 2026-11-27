@@ -209,4 +209,24 @@ describe('TreeExpandButton', () => {
     expect(grid.calls).toEqual([call]);
     expect(document.activeElement).toBe(grid);
   });
+
+  it('in an overflow menu, lists every action as a row, with no menu of its own', async () => {
+    const grid = fakeGrid(false, true);
+    const el = await mount(grid);
+    el.setAttribute('slot', 'overflow');
+    await el.updateComplete;
+
+    const rows = [...(el.shadowRoot?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+    // A popover inside the bar's menu would need a second click to reach these.
+    expect(el.shadowRoot?.querySelector('[popover]')).toBeNull();
+    expect(rows.map((row) => [row.textContent?.trim(), row.disabled])).toEqual([
+      ['Collapse One Level', false],
+      ['Expand All', true],
+      ['Collapse All', false],
+    ]);
+
+    rows[2]?.click();
+    await el.updateComplete;
+    expect(grid.calls).toEqual(['collapse all']);
+  });
 });

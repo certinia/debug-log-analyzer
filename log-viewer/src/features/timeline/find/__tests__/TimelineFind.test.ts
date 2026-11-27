@@ -14,7 +14,7 @@ const query = (text: string, matchCase = false) => ({ text, matchCase });
 function setup(total = 3) {
   const matches = Array.from(
     { length: total },
-    (_, i) => ({ rect: { timeStart: i * 10 } }) as SearchMatch<EventNode>,
+    (_, i) => ({ timeStart: i * 10 }) as SearchMatch<EventNode>,
   );
   let bounds = { timeStart: 0, timeEnd: 100, depthStart: 0, depthEnd: 10 };
   let cursor: SearchCursorImpl<EventNode> | undefined;

@@ -37,14 +37,14 @@ const builtHiding: string[][] = [];
 jest.mock('../detailSections.js', () => ({
   buildDetailSections: (
     _source: string,
-    selection: { eventIndex?: number } | null,
-    active: { kind: string; eventIndex?: number; instances?: number[] } | null,
+    selection: { eventId?: number } | null,
+    active: { kind: string; eventId?: number; eventIds?: number[] } | null,
     sourceView?: string,
     hidden: ReadonlySet<string> = new Set(),
   ) => {
     builtHiding.push([...hidden]);
-    const walked = active?.kind === 'event' ? String(active.eventIndex) : '-';
-    const counted = active?.kind === 'aggregate' ? (active.instances?.join(',') ?? '-') : '-';
+    const walked = active?.kind === 'event' ? String(active.eventId) : '-';
+    const counted = active?.kind === 'aggregate' ? (active.eventIds?.join(',') ?? '-') : '-';
     // The markers carry the anchor and the active frame through to the rendered
     // content, so a stale build resolving late is distinguishable from the one
     // that supersedes it, and a walk is distinguishable from a new pick.
@@ -53,7 +53,7 @@ jest.mock('../detailSections.js', () => ({
           {
             id: 'vitals',
             title: 'Details',
-            content: html`<div class="marker">${selection.eventIndex}</div>
+            content: html`<div class="marker">${selection.eventId}</div>
               <div class="active">${walked}</div>
               <div class="view">${sourceView ?? '-'}</div>
               <div class="bucket">${counted}</div>`,
@@ -72,15 +72,16 @@ jest.mock('../detailSections.js', () => ({
   },
 }));
 
-import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import { eventBus, type DetailSource } from '#core/events/EventBus.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';
 import '../LogInspector.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from '../inspectorReveal.js';
 import type { ContextMenu } from '../ContextMenu.js';
-import { RESET_SECTIONS_ID } from '../sectionMenu.js';
+import type { DockLayout } from '../DockLayout.js';
+import { RESET_SECTIONS_ID, RESET_SIZE_ID, sectionIdFor } from '../sectionMenu.js';
 
 /**
  * Settles the async section build and the render chain through the nested
@@ -101,7 +102,7 @@ async function flush(el: LogInspector): Promise<void> {
 
 /** The stored panel, open and docked right, plus whatever the test is about. */
 function inspectorSettings(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { position: 'right', size: 400, collapsed: {}, visible: true, ...overrides };
+  return { position: 'right', sideSize: 400, collapsed: {}, visible: true, ...overrides };
 }
 
 async function mount(activeTab: string): Promise<LogInspector> {
@@ -130,12 +131,18 @@ function paneView(el: LogInspector): PaneView {
 }
 
 /** The reveal listener sits on `dock-layout`, which renders whether or not a row is selected. */
-function dockLayout(el: LogInspector): HTMLElement {
-  const found = el.shadowRoot?.querySelector<HTMLElement>('dock-layout');
+function dockLayout(el: LogInspector): DockLayout {
+  const found = el.shadowRoot?.querySelector<DockLayout>('dock-layout');
   if (!found) {
     throw new Error('dock-layout not rendered');
   }
   return found;
+}
+
+/** The size the panel lays out at, on the axis it is docked on. */
+function dockedSize(el: LogInspector): string | undefined {
+  const dock = dockLayout(el).shadowRoot?.querySelector<HTMLElement>('detail-dock');
+  return dockLayout(el).dock === 'bottom' ? dock?.style.height : dock?.style.width;
 }
 
 function visible(el: LogInspector): boolean {
@@ -150,8 +157,8 @@ function emptyText(el: LogInspector): string | null {
   return dock?.textContent?.trim() ?? null;
 }
 
-function select(source: DetailSource, eventIndex: number): void {
-  eventBus.emit('detail:select', { source, selection: { kind: 'event', eventIndex } });
+function select(source: DetailSource, eventId: number): void {
+  eventBus.emit('detail:select', { source, selection: { kind: 'event', eventId } });
 }
 
 /** The menu the inspector owns; the pane only reports the right-click. */
@@ -166,6 +173,12 @@ function sectionMenu(el: LogInspector): ContextMenu {
 function openSectionMenu(el: LogInspector, id = 'vitals'): void {
   paneView(el).dispatchEvent(
     new CustomEvent('pane-menu', { detail: { id, x: 10, y: 20 }, bubbles: true, composed: true }),
+  );
+}
+
+function maximize(el: LogInspector, maximized: string | null): void {
+  paneView(el).dispatchEvent(
+    new CustomEvent('pane-maximize', { detail: { maximized }, bubbles: true, composed: true }),
   );
 }
 
@@ -347,6 +360,28 @@ describe('LogInspector', () => {
     expect(builtHiding.at(-1)).toEqual(['callstack']);
   });
 
+  // The press that closes it is also a press outside the menu, which once closed it and reopened it.
+  it('opens the section menu from More actions, and a second press closes it', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    const more = dockLayout(el)
+      .shadowRoot?.querySelector('detail-dock')
+      ?.shadowRoot?.querySelector<HTMLElement>('vscode-icon[title="More actions"]');
+    const press = (): void => {
+      more?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+      more?.click();
+    };
+
+    press();
+    expect(sectionMenu(el).isVisible()).toBe(true);
+
+    // The menu starts listening for a press outside it on the next frame.
+    await flush(el);
+    press();
+    expect(sectionMenu(el).isVisible()).toBe(false);
+  });
+
   it('offers a hidden section back in the menu', async () => {
     settings.inspector = inspectorSettings({
       hiddenSections: { 'timeline:detail:callstack': true },
@@ -358,9 +393,8 @@ describe('LogInspector', () => {
 
     // The menu still offers the hidden one, so it can come back.
     openSectionMenu(el);
-    expect(sectionMenu(el).items.map((item) => [item.id, item.checked])).toEqual([
-      [RESET_SECTIONS_ID, undefined],
-      ['section-sep', undefined],
+    const sectionRows = sectionMenu(el).items.filter((item) => sectionIdFor(item.id));
+    expect(sectionRows.map((item) => [item.id, item.checked])).toEqual([
       ['section:vitals', true],
       ['section:callstack', false],
     ]);
@@ -486,6 +520,144 @@ describe('LogInspector', () => {
     expect(paneView(el).layoutEpoch).toBe(1);
   });
 
+  const resetBy = {
+    'the menu': (el: LogInspector) => {
+      openSectionMenu(el);
+      pickMenuItem(el, RESET_SIZE_ID);
+    },
+    'a double-click on the edge': (el: LogInspector) =>
+      dockLayout(el).dispatchEvent(new CustomEvent('dock-size-reset')),
+  };
+  it.each([
+    ['right', 'the menu', '900px', '560px', 'inspector.sideSize'],
+    ['right', 'a double-click on the edge', '900px', '560px', 'inspector.sideSize'],
+    ['bottom', 'the menu', '300px', '33.333%', 'inspector.bottomSize'],
+    ['bottom', 'a double-click on the edge', '300px', '33.333%', 'inspector.bottomSize'],
+  ] as const)(
+    'docked %s, resets the stored size from %s and leaves the sections alone',
+    async (position, by, stored, initial, key) => {
+      settings.inspector = inspectorSettings({ position, sideSize: 900, bottomSize: 300 });
+      const el = await mount('timeline-tab');
+      select('timeline', 1);
+      await flush(el);
+      expect(dockedSize(el)).toBe(stored);
+
+      resetBy[by](el);
+      await flush(el);
+
+      expect(dockedSize(el)).toBe(initial);
+      // Unset rather than the default, so a later default still reaches this user.
+      expect(written).toEqual([{ section: key, value: null }]);
+    },
+  );
+
+  it('keeps a width beside the view and a height below it, a third of the view by default', async () => {
+    settings.inspector = inspectorSettings({ sideSize: 900 });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    const redock = async (position: string) => {
+      dockLayout(el).dispatchEvent(
+        new CustomEvent('dock-position-change', { detail: { position } }),
+      );
+      await flush(el);
+    };
+
+    await redock('bottom');
+    // A width would leave the main view no room above it.
+    expect(dockedSize(el)).toBe('33.333%');
+    dockLayout(el).dispatchEvent(new CustomEvent('dock-resize', { detail: { size: 300 } }));
+    await flush(el);
+    expect(dockedSize(el)).toBe('300px');
+
+    await redock('right');
+    expect(dockedSize(el)).toBe('900px');
+    expect(written).toContainEqual({ section: 'inspector.bottomSize', value: 300 });
+    expect(written.map((w) => w.section)).not.toContain('inspector.sideSize');
+  });
+
+  it('keeps a maximized section to the list it was maximized in', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+    expect(paneView(el).maximized).toBe('callstack');
+
+    // Database builds a `callstack` too, but it is another list.
+    el.activeTab = 'database-tab';
+    select('database', 2);
+    await flush(el);
+    expect(paneView(el).maximized).toBeNull();
+
+    el.activeTab = 'timeline-tab';
+    await flush(el);
+    expect(paneView(el).maximized).toBe('callstack');
+  });
+
+  it('restores the stack on request, and never stores either choice', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    maximize(el, 'callstack');
+    await flush(el);
+    maximize(el, null);
+    await flush(el);
+
+    expect(paneView(el).maximized).toBeNull();
+    expect(written).toEqual([]);
+  });
+
+  it('forgets the maximized section once it is hidden, so showing it again restores the stack', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:callstack');
+    await flush(el);
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:callstack');
+    await flush(el);
+
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+    expect(paneView(el).maximized).toBeNull();
+  });
+
+  it('keeps the maximized section when another one is hidden', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:vitals');
+    await flush(el);
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:vitals');
+    await flush(el);
+
+    expect(paneView(el).maximized).toBe('callstack');
+  });
+
+  it('restores the stack on a reset', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+
+    openSectionMenu(el, 'callstack');
+    pickMenuItem(el, RESET_SECTIONS_ID);
+    await flush(el);
+
+    expect(paneView(el).maximized).toBeNull();
+  });
+
   it('auto-opens on the first selection only while the user has never chosen', async () => {
     const el = await mount('timeline-tab');
     select('timeline', 1);
@@ -540,15 +712,49 @@ describe('LogInspector', () => {
     expect(paneView(el).collapsed).toEqual({ vitals: true });
   });
 
+  it('keeps the stored height when only the width was dragged before the settings load', async () => {
+    settings.inspector = inspectorSettings({ sideSize: 400, bottomSize: 300 });
+    deferSettings = true;
+    const el = document.createElement('log-inspector') as LogInspector;
+    el.activeTab = 'timeline-tab';
+    document.body.appendChild(el);
+    select('timeline', 1);
+    await flush(el);
+
+    dockLayout(el).dispatchEvent(new CustomEvent('dock-resize', { detail: { size: 700 } }));
+    releaseSettings?.();
+    await flush(el);
+    expect(dockedSize(el)).toBe('700px');
+
+    dockLayout(el).dispatchEvent(
+      new CustomEvent('dock-position-change', { detail: { position: 'bottom' } }),
+    );
+    await flush(el);
+    expect(dockedSize(el)).toBe('300px');
+  });
+
+  it('hides the panel when its edge is dragged past the minimum', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(visible(el)).toBe(true);
+
+    dockLayout(el).dispatchEvent(new CustomEvent('dock-collapse'));
+    await flush(el);
+
+    expect(visible(el)).toBe(false);
+    expect(written).toEqual([{ section: 'inspector.visible', value: false }]);
+  });
+
   it('stamps the active tab on a reveal, so only that tab acts on it', async () => {
     const el = await mount('tree-tab');
 
-    const seen: Array<{ source: string; eventIndex: number }> = [];
+    const seen: Array<{ source: string; eventId: number }> = [];
     const off = eventBus.on('inspector:reveal', (d) => seen.push(d));
     dispatchInspectorReveal(dockLayout(el), 5);
     off();
 
-    expect(seen).toEqual([{ source: 'calltree', eventIndex: 5 }]);
+    expect(seen).toEqual([{ source: 'calltree', eventId: 5 }]);
   });
 
   it('follows a revealed frame while the selection that anchors the stack holds', async () => {
@@ -626,7 +832,7 @@ describe('LogInspector', () => {
     select('timeline', 1);
     await flush(el);
 
-    const seen: Array<{ source: string; eventIndexes: readonly number[]; sticky: boolean }> = [];
+    const seen: Array<{ source: string; eventIds: readonly number[]; sticky: boolean }> = [];
     const off = eventBus.on('inspector:locate', (d) => seen.push(d));
     dispatchInspectorLocate(dockLayout(el), [5, 9]);
     dispatchInspectorLocate(dockLayout(el), []);
@@ -634,9 +840,9 @@ describe('LogInspector', () => {
     off();
 
     expect(seen).toEqual([
-      { source: 'timeline', eventIndexes: [5, 9], sticky: false },
-      { source: 'timeline', eventIndexes: [], sticky: false },
-      { source: 'timeline', eventIndexes: [5, 9], sticky: true },
+      { source: 'timeline', eventIds: [5, 9], sticky: false },
+      { source: 'timeline', eventIds: [], sticky: false },
+      { source: 'timeline', eventIds: [5, 9], sticky: true },
     ]);
     // A locate picks nothing, so neither the anchor nor the walk moves.
     await flush(el);
@@ -650,8 +856,8 @@ describe('LogInspector', () => {
 
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
-      instances: [5, 9],
-      frames: [5, 9],
+      eventIds: [5, 9],
+      frameIds: [5, 9],
     });
     await flush(el);
 
@@ -677,8 +883,8 @@ describe('LogInspector', () => {
     select('timeline', 1);
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
-      instances: [5, 9],
-      frames: [5, 9],
+      eventIds: [5, 9],
+      frameIds: [5, 9],
     });
     await flush(el);
 
@@ -693,8 +899,8 @@ describe('LogInspector', () => {
     select('timeline', 1);
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
-      instances: [5, 9],
-      frames: [5, 9],
+      eventIds: [5, 9],
+      frameIds: [5, 9],
     });
     await flush(el);
 
@@ -711,14 +917,14 @@ describe('LogInspector', () => {
     await flush(el);
     dispatchInspectorLocate(dockLayout(el), [5]);
 
-    const seen: Array<{ source: string; eventIndexes: readonly number[]; sticky: boolean }> = [];
+    const seen: Array<{ source: string; eventIds: readonly number[]; sticky: boolean }> = [];
     const off = eventBus.on('inspector:locate', (d) => seen.push(d));
     el.activeTab = 'database-tab';
     await flush(el);
     off();
 
     // Sticky, so a picked row's mark goes with the pointer's.
-    expect(seen).toEqual([{ source: 'timeline', eventIndexes: [], sticky: true }]);
+    expect(seen).toEqual([{ source: 'timeline', eventIds: [], sticky: true }]);
   });
 
   it('drops a reveal from a tab with no inspectable view', async () => {
@@ -853,7 +1059,7 @@ describe('LogInspector', () => {
 
     await loadLog(el);
 
-    // An eventIndex names frames of the log it was picked in, so the panel comes
+    // An eventId names frames of the log it was picked in, so the panel comes
     // back to its empty state rather than describing the new log through it.
     expect(emptyText(el)).not.toBeNull();
 

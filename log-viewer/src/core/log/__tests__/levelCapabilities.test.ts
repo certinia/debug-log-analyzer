@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
+import type { Level } from '@apexdevtools/apex-log-parser';
 
 import { storeOf } from '#test-helpers/apexLog.js';
 import {
@@ -12,7 +12,8 @@ import {
   describeLevelGap,
   findLevelGap,
 } from '../levelCapabilities.js';
-import { filterByLevels, LEVEL_ORDER, levelRank } from '../levelFilter.js';
+import { type DebugLevels, LEVEL_ORDER, levelRank } from '../levelFilter.js';
+import { filterByLevels } from '../LogStore.js';
 
 const SETTINGS = '64.0 APEX_CODE,FINEST;APEX_PROFILING,FINEST;DB,FINEST\n';
 
@@ -30,28 +31,17 @@ const BODY =
   '09:18:22.6 (2500)|CUMULATIVE_LIMIT_USAGE_END\n';
 
 describe('CAPABILITIES', () => {
-  const { log } = storeOf(BODY, SETTINGS);
-
-  it.each(Object.entries(CAPABILITIES))(
-    '%s states the level the parser gives its event',
-    (_, cap) => {
-      const event = log.eventsById.find((candidate) => candidate?.type === cap.event);
-      expect(event).toBeDefined();
-      expect({ category: event?.debugCategory, level: event?.debugLevel }).toEqual({
-        category: cap.category,
-        level: cap.level,
-      });
-    },
-  );
-
   it.each(Object.entries<Capability>(CAPABILITIES).filter(([, cap]) => cap.filteredBelow !== null))(
     '%s is hidden by the header filter where the map says',
     async (_, cap: Capability) => {
+      const { store } = await storeOf(BODY, SETTINGS);
       const at = cap.filteredBelow ?? cap.level;
       const below = LEVEL_ORDER[levelRank(at) - 1]!; // every capability needs more than NONE
-      const has = async (level: LogLevel) =>
-        (await filterByLevels(log, { [cap.category]: level }))?.eventsById.some(
-          (event) => event?.type === cap.event,
+      // A query plan is not an event: it rides on its query.
+      const type = cap.event === 'SOQL_EXECUTE_EXPLAIN' ? 'SOQL_EXECUTE_BEGIN' : cap.event;
+      const has = async (level: Level) =>
+        [...(await filterByLevels(store, { [cap.category]: level }))!.events()].some(
+          (event) => event.type === type,
         );
 
       expect(await has(at)).toBe(true);

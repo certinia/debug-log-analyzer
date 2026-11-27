@@ -13,7 +13,7 @@
  * - Owns selectedMarker state (marker selection)
  * - Owns TreeNavigator instance (internal)
  * - Provides selection lifecycle (select, clear, navigate)
- * - Maps LogEvent to TreeNode for hit test integration
+ * - Maps ApexEvent to TreeNode for hit test integration
  *
  * Selection is mutually exclusive: selecting a frame clears marker selection and vice versa.
  */

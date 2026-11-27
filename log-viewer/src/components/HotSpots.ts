@@ -6,10 +6,10 @@ import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { formatDuration, sharePercent } from '../core/utility/Util.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration, sharePercent } from '#core/utility/Util.js';
 import {
   executionHighlights,
   type HotSpotRow,
@@ -84,7 +84,7 @@ export class HotSpots extends LitElement {
           '--row-hue': this._palette.colorFor(spot.category),
           '--self-pct': `${sharePercent(spot.selfTime, spot.totalTime)}%`,
         })}
-        @click=${() => dispatchInspectorReveal(this, spot.eventIndex)}
+        @click=${() => dispatchInspectorReveal(this, spot.eventId)}
       >
         ${categoryLabel(spot.category)}
         <span class="reveal-row__name" title=${spot.text}>${spot.text}</span>

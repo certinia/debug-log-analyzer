@@ -2,8 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import { bareAddress } from './variableLine.js';
-
 /**
  * Reads the shape of a logged variable value, without ever trusting it as JSON.
  *
@@ -16,6 +14,23 @@ import { bareAddress } from './variableLine.js';
  * The log records one level, so this reads one level. Nesting a scan deeper
  * would only ever find the `{}` the log put there.
  */
+
+const ADDRESS = /^0x[0-9a-f]+$/i;
+
+/** The longest an address is. Past it, a value cannot be one. */
+const ADDRESS_MAX = 32;
+
+/** The address a value is, where the log wrote an address in place of a value:
+ *  the value would not serialise, so the log named where it lived instead.
+ *
+ *  Length first, so a very long value is rejected without being copied. */
+function bareAddress(value: string): string | null {
+  if (value.length > ADDRESS_MAX * 2) {
+    return null;
+  }
+  const text = value.trim();
+  return ADDRESS.test(text) ? text : null;
+}
 
 /** Text over this length earns an expander: it cannot be read in a row. */
 export const EXPAND_MIN_CHARS = 80;

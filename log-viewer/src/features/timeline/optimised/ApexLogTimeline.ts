@@ -7,28 +7,23 @@
  *
  * Handles all Apex-specific logic:
  * - ApexLog data structures
- * - Tooltip generation for LogEvents
+ * - Tooltip generation for ApexEvents
  * - Navigation to source (goToRow)
  * - External callbacks
  *
  * It should only be responsible for managing calls to FlameChart and wiring.
  * It should NOT contain any rendering, rectangle computation, or search logic (all in FlameChart).
- * FlameChart should remain agnostic of Apex-specifics e.g LogEvent structure and tooltips.
- * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
+ * FlameChart should remain agnostic of Apex-specifics e.g ApexEvent structure and tooltips.
+ * ApexEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
-import { eventBus, type TimelineNavigateMode } from '../../../core/events/EventBus.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { copyToClipboard } from '../../../core/utility/Clipboard.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import {
-  findEventByEventIndex,
-  findEventByTimestamp,
-  type EventSearchResult,
-} from '../../../core/utility/EventSearch.js';
+import { eventBus, type TimelineNavigateMode } from '#core/events/EventBus.js';
+import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import { copyToClipboard } from '#core/utility/Clipboard.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -38,12 +33,15 @@ import {
   type EventNode,
   type HoverCause,
   type ModifierKeys,
+  NO_ROW,
+  type TimelineFrames,
   type TimelineMarker,
   type TimelineOptions,
   type ViewportState,
 } from '../types/flamechart.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { logStoreFor } from '../../../core/log/LogStore.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import {
   revealTarget,
@@ -52,7 +50,11 @@ import {
 } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
-import { buildTimelineFrames } from '../utils/timeline-frames.js';
+import {
+  buildTimelineFrames,
+  drawnRowAtOrAbove,
+  type ApexEventNode,
+} from '../utils/timeline-frames.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
 import { apexLimitSeries } from './apex-limit-series.js';
@@ -68,14 +70,15 @@ interface ApexTimelineOptions extends TimelineOptions {
  *  a selection with where its time went. */
 const TIMELINE_VIEW = 'callees' as const;
 
-/** Where a found event sits, as the reveal policy reads it. */
-function placementOf(result: EventSearchResult): FramePlacement {
-  return {
-    timestamp: result.event.timestamp,
-    duration: result.event.duration.total,
-    depth: result.depth,
-  };
+/** Where a found event sits, and its node when the chart draws it. */
+interface Located {
+  placement: FramePlacement;
+  node: ApexEventNode | null;
 }
+
+// FlameChart hands back the nodes `frames` built, so each one carries its event.
+const eventOf = (node: EventNode | null): ApexEvent | undefined =>
+  (node as ApexEventNode | null)?.original;
 
 export class ApexLogTimeline {
   private flamechart: FlameChart;
@@ -84,7 +87,8 @@ export class ApexLogTimeline {
   private apexLog: ApexLog | null = null;
   private options: TimelineOptions = {};
   private container: HTMLElement | null = null;
-  private events: LogEvent[] = [];
+  private index: LogIndex | null = null;
+  private frames: TimelineFrames<ApexEventNode> | null = null;
   private selectedEventForContextMenu: EventNode | null = null;
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
@@ -92,7 +96,7 @@ export class ApexLogTimeline {
   /** Guards the programmatic select made on the inspector's behalf. */
   private echoGuard = new SelectionEchoGuard();
   /** Frame last reported to the inspector as under the pointer. */
-  private locatedEventIndex: number | null = null;
+  private locatedEventId: number | null = null;
   /** The panel belongs to a frame find or the keyboard moved to, not to the pointer. */
   private navigationTooltip = false;
   /** The frames kept in colour while the rest of the chart is dimmed. */
@@ -116,9 +120,10 @@ export class ApexLogTimeline {
    */
   public async init(
     container: HTMLElement,
-    apexLog: ApexLog,
+    store: LogStore,
     options: ApexTimelineOptions = {},
   ): Promise<void> {
+    const apexLog = store.log;
     this.apexLog = apexLog;
     this.options = options;
     this.container = container;
@@ -134,24 +139,23 @@ export class ApexLogTimeline {
     });
 
     const markers = extractMarkers(this.apexLog).concat(extractExceptionMarkers(this.apexLog));
-    this.events = this.extractEvents();
 
     // Derive categories from shared constant (ensures compile-time sync with color map)
     const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
 
-    const store = logStoreFor(apexLog);
     const [index, heatStripSeries] = await Promise.all([
       store.logIndex(),
       store.derive(apexLimitSeries),
     ]);
-    // `exitStamp`, not `executionEndTime`: a trailing zero-duration event, such as the
+    // The log's own end, not its last frame's: a trailing zero-duration event, such as the
     // FATAL_ERROR closing a truncated log, still ends the log.
-    const frames = buildTimelineFrames(index, categories, this.apexLog.exitStamp);
+    const frames = buildTimelineFrames(index, categories, apexLog.columns.endTimestamp[0]!);
+    this.index = index;
+    this.frames = frames;
 
     // Initialize FlameChart with Apex-specific callbacks
     await this.flamechart.init(
       container,
-      this.events,
       frames,
       markers,
       { ...options, enableSearch: true }, // Enable search via options
@@ -223,19 +227,14 @@ export class ApexLogTimeline {
       heatStripSeries.events.length > 0 ? heatStripSeries : null,
     );
 
-    // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).
     this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', (detail) => {
-      if (detail.eventIndex !== undefined) {
-        this.navigateToEventIndex(detail.eventIndex);
-      } else {
-        this.navigateToTimestamp(detail.timestamp, detail.mode);
-      }
+      this.navigateToTimestamp(detail.timestamp, detail.mode);
     });
 
     this.inspectorUnsubscribe = wireInspectorTab('timeline', this.emphasis, {
-      mark: (eventIndexes) => this.applyEmphasis(eventIndexes),
-      reveal: (eventIndex) => this.selectFrameByEventIndex(eventIndex),
-      revealMerged: (eventIndexes) => this.panToNearestFrame(eventIndexes),
+      mark: (eventIds) => this.applyEmphasis(eventIds),
+      reveal: (eventId) => this.selectFrameByEventId(eventId),
+      revealMerged: (eventIds) => this.panToNearestFrame(eventIds),
       clear: () => {
         // The chart reports the clear itself. Its own Escape, with the container
         // focused, consumes the key before this.
@@ -245,31 +244,26 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Select the frame for `eventIndex` and centre the view on it. Passive sync,
+   * Select the frame for `eventId` and centre the view on it. Passive sync,
    * so it never zooms - a full focus would be too disruptive.
    */
-  private selectFrameByEventIndex(eventIndex: number): void {
-    if (!this.apexLog) {
+  private selectFrameByEventId(eventId: number): void {
+    const located = this.locate(eventId);
+    const node = located?.node;
+    if (!node) {
       return;
     }
 
-    const result = findEventByEventIndex(this.apexLog, eventIndex);
-    if (!result) {
-      return;
-    }
-
-    const selected = this.echoGuard.run(() =>
-      this.flamechart.selectByEventNode(this.toEventNode(result)),
-    );
+    const selected = this.echoGuard.run(() => this.flamechart.selectByEventNode(node));
     if (!selected) {
       return;
     }
 
     // The inspector asked for this frame, so its mark is what dims the rest. Set after the
     // run: the select inside it clears the mark, as any chart select does.
-    this.pickEmphasis(eventIndex);
+    this.pickEmphasis(eventId);
 
-    this.bringIntoView([placementOf(result)]);
+    this.bringIntoView([located.placement]);
   }
 
   /**
@@ -277,8 +271,8 @@ export class ApexLogTimeline {
    * screen. Selects nothing: the row names no single frame, so its mark on all
    * of them is what locates them.
    */
-  private panToNearestFrame(eventIndexes: readonly number[]): void {
-    this.bringIntoView(this.resolveEvents(eventIndexes).map(placementOf));
+  private panToNearestFrame(eventIds: readonly number[]): void {
+    this.bringIntoView(this.resolve(eventIds).map((located) => located.placement));
   }
 
   /**
@@ -294,28 +288,85 @@ export class ApexLogTimeline {
     }
   }
 
-  /** The events `eventIndexes` name, with their depths, skipping any the log lost. */
-  private resolveEvents(eventIndexes: readonly number[]): EventSearchResult[] {
-    const apexLog = this.apexLog;
-    return apexLog
-      ? eventIndexes.flatMap((eventIndex) => findEventByEventIndex(apexLog, eventIndex) ?? [])
-      : [];
+  /** Where the events `eventIds` name sit, skipping any the shown log lacks. */
+  private resolve(eventIds: readonly number[]): Located[] {
+    return eventIds.flatMap((eventId) => this.locate(eventId) ?? []);
+  }
+
+  /** Where event `eventId` sits; null when the shown log has no such event. */
+  private locate(eventId: number): Located | null {
+    const row = this.index?.rowOf(eventId) ?? NO_ROW;
+    return row === NO_ROW ? null : this.locateRow(row);
   }
 
   /**
-   * Keep `eventIndexes` in colour and dim the rest of the chart, or drop the
+   * The deepest drawn frame whose span holds `timestamp`. A frame that starts at
+   * `timestamp` is taken without looking deeper.
+   */
+  private locateAt(timestamp: number): Located | null {
+    const frames = this.frames;
+    if (!frames) {
+      return null;
+    }
+    const { start, total, subtreeEnd } = frames;
+    let found = NO_ROW;
+    for (let depth = 0; depth <= frames.maxDepth; depth++) {
+      const rows = frames.rowsAtDepth(depth);
+      let low = 0;
+      let high = rows.length - 1;
+      let at = -1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (start[rows[mid]!]! <= timestamp) {
+          at = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+      const row = at < 0 ? NO_ROW : rows[at]!;
+      const holds = row !== NO_ROW && timestamp <= start[row]! + total[row]!;
+      const under = found === NO_ROW || (row > found && row < subtreeEnd[found]!);
+      if (!holds || !under) {
+        break;
+      }
+      found = row;
+      if (start[row] === timestamp) {
+        break;
+      }
+    }
+    return found === NO_ROW ? null : this.locateRow(found);
+  }
+
+  private locateRow(row: number): Located | null {
+    const frames = this.frames;
+    if (!frames) {
+      return null;
+    }
+    return {
+      placement: {
+        timestamp: frames.start[row]!,
+        duration: frames.total[row]!,
+        depth: frames.depth[row]!,
+      },
+      node: frames.isVisible(row) ? frames.node(row).data : null,
+    };
+  }
+
+  /**
+   * Keep `eventIds` in colour and dim the rest of the chart, or drop the
    * emphasis when there are none. A grouped inspector row names every occurrence
    * it merges, so all of them light at once. Never selects, never pans.
    */
-  private applyEmphasis(eventIndexes: readonly number[]): void {
+  private applyEmphasis(eventIds: readonly number[]): void {
     this.flamechart.locateByEventNodes(
-      this.resolveEvents(eventIndexes).map((result) => this.toEventNode(result)),
+      this.resolve(eventIds).flatMap((located) => located.node ?? []),
     );
   }
 
   /** Rest the emphasis on one frame, until something else picks or clears it. */
-  private pickEmphasis(eventIndex: number): void {
-    this.applyEmphasis(this.emphasis.pick([eventIndex]));
+  private pickEmphasis(eventId: number): void {
+    this.applyEmphasis(this.emphasis.pick([eventId]));
   }
 
   /** Drop the resting emphasis, so nothing dims. */
@@ -324,58 +375,44 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Navigate to a specific event using parser-assigned eventIndex.
+   * Navigate to the event with id `eventId`.
    */
-  public navigateToEventIndex(eventIndex: number): void {
-    if (!this.apexLog) {
-      return;
-    }
-
-    this._reveal(findEventByEventIndex(this.apexLog, eventIndex));
+  public navigateToEventId(eventId: number): void {
+    const row =
+      this.index && this.frames ? drawnRowAtOrAbove(this.index, this.frames, eventId) : NO_ROW;
+    // With no drawn frame above it, such as the FATAL_ERROR closing a truncated log, still move to its time.
+    this._reveal(row === NO_ROW ? this.locate(eventId) : this.locateRow(row));
   }
 
   /**
    * Navigate to a specific timestamp in the timeline.
-   * Called via EventBus 'timeline:navigate-to' event from CalltreeView,
-   * or directly from TimelineFlameChart after initialization.
+   * Called via EventBus 'timeline:navigate-to'.
    * 'reveal' selects the frame at the timestamp and zooms to it; 'seek' zooms to
    * a window of the log around the instant and selects nothing.
    */
   public navigateToTimestamp(timestamp: number, mode: TimelineNavigateMode = 'reveal'): void {
-    if (!this.events) {
-      return;
-    }
-    // Find event by timestamp (binary search - events sorted by time)
-    const result = findEventByTimestamp(this.events, timestamp);
+    const located = this.locateAt(timestamp);
     if (mode === 'reveal') {
-      this._reveal(result);
+      this._reveal(located);
       return;
     }
     // The frame only gives the depth to centre on; the window is the log's, and
     // padding 0 keeps the width asked for.
     const { start, width } = seekWindow(timestamp, this.apexLog?.duration.total ?? 0);
-    this.flamechart.focusOn(start, width, result?.depth ?? 0, 0);
+    this.flamechart.focusOn(start, width, located?.placement.depth ?? 0, 0);
   }
 
-  private _reveal(result: { event: LogEvent; depth: number } | null): void {
-    if (!result) {
+  // A frame the chart does not draw, such as a zero-duration event, is still zoomed to.
+  private _reveal(located: Located | null): void {
+    if (!located) {
       return;
     }
 
-    this.flamechart.selectByEventNode(this.toEventNode(result));
-    const { timestamp, duration } = result.event;
-    this.flamechart.focusOn(timestamp, duration.total, result.depth);
-  }
-
-  private toEventNode(result: { event: LogEvent; depth: number }): EventNode {
-    return {
-      id: `${result.event.eventIndex}-${result.depth}`,
-      timestamp: result.event.timestamp,
-      duration: result.event.duration.total,
-      type: result.event.type ?? result.event.category ?? 'UNKNOWN',
-      text: result.event.text,
-      original: result.event,
-    };
+    if (located.node) {
+      this.flamechart.selectByEventNode(located.node);
+    }
+    const { timestamp, duration, depth } = located.placement;
+    this.flamechart.focusOn(timestamp, duration, depth);
   }
 
   /**
@@ -388,7 +425,7 @@ export class ApexLogTimeline {
     }
 
     const startTime = this.apexLog.startTime ?? 0;
-    const firstTimestamp = this.apexLog.timestamp;
+    const firstTimestamp = this.apexLog.columns.startTimestamp[0]!;
     this.flamechart.setTimeDisplayMode(mode, startTime, firstTimestamp);
   }
 
@@ -535,8 +572,8 @@ export class ApexLogTimeline {
 
     // Priority: Events take precedence over truncation markers
     if (eventNode) {
-      // Extract LogEvent from EventNode.original for tooltip display
-      const logEvent = eventNode.original as LogEvent | undefined;
+      // Extract ApexEvent from EventNode.original for tooltip display
+      const logEvent = eventOf(eventNode);
       if (logEvent) {
         this.tooltipRenderer.show(logEvent, this.buildAnchor(eventNode, screenX, screenY));
 
@@ -562,15 +599,15 @@ export class ApexLogTimeline {
    * that stands for it. Mouse moves land per pixel, so only a change is reported.
    */
   private reportLocatedFrame(eventNode: EventNode | null): void {
-    const logEvent = eventNode?.original as LogEvent | undefined;
-    const eventIndex = logEvent?.eventIndex ?? null;
-    if (eventIndex === this.locatedEventIndex) {
+    const logEvent = eventOf(eventNode);
+    const eventId = logEvent?.id ?? null;
+    if (eventId === this.locatedEventId) {
       return;
     }
-    this.locatedEventIndex = eventIndex;
+    this.locatedEventId = eventId;
     eventBus.emit('detail:locate', {
       source: 'timeline',
-      eventIndexes: eventIndex === null ? [] : [eventIndex],
+      eventIds: eventId === null ? [] : [eventId],
     });
   }
 
@@ -620,17 +657,17 @@ export class ApexLogTimeline {
     // Cmd/Ctrl+Click on a frame navigates directly to call tree
     // Note: Only works on individual frames, not buckets (buckets are aggregated)
     if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
-      const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-      if (originalEvent?.eventIndex !== undefined) {
-        void goToRow({ eventIndex: originalEvent.eventIndex });
+      const originalEvent = eventOf(eventNode);
+      if (originalEvent?.id !== undefined) {
+        void goToRow({ eventId: originalEvent.id });
       }
       return;
     }
 
     // Cmd/Ctrl+Click on a marker navigates directly to call tree
     if (marker && (modifiers?.metaKey || modifiers?.ctrlKey)) {
-      if (marker.eventIndex !== undefined) {
-        void goToRow({ eventIndex: marker.eventIndex });
+      if (marker.eventId !== undefined) {
+        void goToRow({ eventId: marker.eventId });
       }
       return;
     }
@@ -674,8 +711,8 @@ export class ApexLogTimeline {
     // Selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
     // The inspector shows the selected frame's detail.
-    const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-    const selection = toDetailSelection(originalEvent?.eventIndex);
+    const originalEvent = eventOf(eventNode);
+    const selection = toDetailSelection(originalEvent?.id);
     if (selection) {
       eventBus.emit('detail:select', { source: 'timeline', selection, view: TIMELINE_VIEW });
     }
@@ -686,9 +723,9 @@ export class ApexLogTimeline {
    * Navigates call tree to the selected frame.
    */
   private handleJumpToCallTree(eventNode: EventNode): void {
-    const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-    if (originalEvent?.eventIndex !== undefined) {
-      void goToRow({ eventIndex: originalEvent.eventIndex });
+    const originalEvent = eventOf(eventNode);
+    if (originalEvent?.id !== undefined) {
+      void goToRow({ eventId: originalEvent.id });
     }
   }
 
@@ -697,8 +734,8 @@ export class ApexLogTimeline {
    * Navigates call tree to the marker's start time.
    */
   private handleJumpToCallTreeForMarker(marker: TimelineMarker): void {
-    if (marker.eventIndex !== undefined) {
-      void goToRow({ eventIndex: marker.eventIndex });
+    if (marker.eventId !== undefined) {
+      void goToRow({ eventId: marker.eventId });
     }
   }
 
@@ -720,8 +757,8 @@ export class ApexLogTimeline {
 
     // Marker selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
-    // Markers only carry an eventIndex when they map to a log event.
-    const selection = toDetailSelection(marker.eventIndex);
+    // Markers only carry an eventId when they map to a log event.
+    const selection = toDetailSelection(marker.eventId);
     if (selection) {
       eventBus.emit('detail:select', { source: 'timeline', selection, view: TIMELINE_VIEW });
     }
@@ -736,8 +773,7 @@ export class ApexLogTimeline {
       return;
     }
 
-    const eventWithOriginal = event as EventNode & { original?: LogEvent };
-    const logEvent = eventWithOriginal.original;
+    const logEvent = eventOf(event);
     if (logEvent) {
       this.navigationTooltip = true;
       this.tooltipRenderer.show(logEvent, this.buildAnchor(event, screenX, screenY));
@@ -819,8 +855,7 @@ export class ApexLogTimeline {
     this.selectedEventForContextMenu = eventNode;
 
     // Show tooltip for the right-clicked frame using screen coords (same as hover)
-    const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
-    const logEvent = eventWithOriginal.original;
+    const logEvent = eventOf(eventNode);
     if (this.tooltipRenderer && logEvent) {
       this.tooltipRenderer.show(logEvent, this.buildAnchor(eventNode, screenX, screenY), {
         keepPosition: true,
@@ -838,11 +873,11 @@ export class ApexLogTimeline {
       { id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' },
     ];
 
-    if (logEvent?.hasValidSymbols) {
+    if (logEvent?.isApexCall) {
       navActions.push({ id: 'go-to-source', label: 'Go to Source' });
     }
 
-    if (logEvent?.timestamp) {
+    if (logEvent?.startTimestamp) {
       navActions.push({ id: 'show-in-log', label: 'Show in Log File' });
     }
 
@@ -995,10 +1030,9 @@ export class ApexLogTimeline {
    * Navigates to the raw log file at the event's timestamp.
    */
   private handleShowInLog(eventNode: EventNode): void {
-    const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
-    const logEvent = eventWithOriginal.original;
-    if (logEvent?.timestamp) {
-      vscodeMessenger.send('goToLogLine', { timestamp: logEvent.timestamp });
+    const logEvent = eventOf(eventNode);
+    if (logEvent?.startTimestamp) {
+      vscodeMessenger.send('goToLogLine', { timestamp: logEvent.startTimestamp });
     }
   }
 
@@ -1007,9 +1041,8 @@ export class ApexLogTimeline {
    * Opens the source file in VS Code for methods with valid symbols.
    */
   private handleGoToSource(eventNode: EventNode): void {
-    const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
-    const logEvent = eventWithOriginal.original;
-    if (logEvent?.hasValidSymbols) {
+    const logEvent = eventOf(eventNode);
+    if (logEvent?.isApexCall && logEvent.text) {
       vscodeMessenger.send<string>('openType', logEvent.text);
     }
   }
@@ -1018,13 +1051,13 @@ export class ApexLogTimeline {
    * Format event details for clipboard (similar to tooltip content).
    */
   private formatEventDetails(eventNode: EventNode): string {
-    // Access original LogEvent for full details
-    const logEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    // Access original ApexEvent for full details
+    const logEvent = eventOf(eventNode);
     if (!logEvent) {
       // Fallback for nodes without original
       return `Name: ${eventNode.text}\nType: ${eventNode.type}`;
     }
-    return formatEventDetails(logEvent, this.apexLog?.governorLimits);
+    return formatEventDetails(logEvent, this.apexLog?.limits);
   }
 
   /**
@@ -1032,7 +1065,7 @@ export class ApexLogTimeline {
    * Builds the parent chain from root to the selected event.
    */
   private formatCallStack(eventNode: EventNode): string {
-    const logEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    const logEvent = eventOf(eventNode);
     return logEvent ? formatCallStack(logEvent) : eventNode.text;
   }
 
@@ -1051,20 +1084,6 @@ export class ApexLogTimeline {
     }
 
     return lines.join('\n');
-  }
-
-  /**
-   * Extract events array from rootLog.
-   * Handles the conversion from ApexLog structure to LogEvent array.
-   */
-  private extractEvents(): LogEvent[] {
-    if (!this.apexLog) {
-      return [];
-    }
-
-    // ApexLog extends LogEvent, which has a children property
-    // containing the hierarchical event structure
-    return this.apexLog.children || [];
   }
 
   // ============================================================================

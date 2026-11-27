@@ -11,7 +11,7 @@ import { makeViewport } from '#test-helpers/viewport.js';
 import { FlameChart } from '../FlameChart.js';
 import { TimelineViewport } from '../TimelineViewport.js';
 
-const HIT_NODE = { id: '0-0', timestamp: 0, duration: 10, depth: 0, original: { eventIndex: 1 } };
+const HIT_NODE = { id: '0-0', timestamp: 0, duration: 10, depth: 0, original: { eventId: 1 } };
 
 /** The private collaborators `resize` and one `render()` need to reach the wash, and nothing else. */
 function stubbedChart({ displayHeight = 300, culling = false } = {}): {

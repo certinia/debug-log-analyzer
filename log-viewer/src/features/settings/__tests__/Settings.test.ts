@@ -6,7 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 // Hoisted above the import, so the mock can't close over a `const` declared here.
-jest.mock('../../../core/messaging/VSCodeExtensionMessenger.js', () => ({
+jest.mock('#core/messaging/VSCodeExtensionMessenger.js', () => ({
   VSCodeExtensionMessenger: {
     listen: (callback: EventListener) => {
       window.addEventListener('message', callback);
@@ -18,7 +18,7 @@ jest.mock('../../../core/messaging/VSCodeExtensionMessenger.js', () => ({
   vscodeMessenger: { request: jest.fn(() => Promise.reject(new Error('no host'))) },
 }));
 
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { settingsSettled, subscribeSettings, type LanaSettings } from '../Settings.js';
 
 const requestMock = vscodeMessenger.request as jest.Mock;

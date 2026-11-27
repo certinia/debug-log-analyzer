@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
-import { frameVariablesFor, type VariableIndex, type VariableRow } from './frameVariables.js';
+import { frameVariablesFor, type VariableRow } from './frameVariables.js';
 import type { LogStore } from './LogStore.js';
 
 /**
@@ -39,9 +39,8 @@ export const MAX_VALUES_PER_NAME = 1_000;
 export const MAX_MARKED_PER_VALUE = 200;
 
 /** What a compared frame is read with, allocated once: a wide selection reads
- *  tens of thousands of frames. Statics are not compared, and the rows are
- *  grouped by name here, so the per-frame sort is thrown away. */
-const AS_READ = { statics: false, sorted: false } as const;
+ *  tens of thousands of frames. Statics are not compared. */
+const AS_READ = { statics: false } as const;
 
 /** One value a name held, and which calls held it. */
 export interface SpreadValue {
@@ -55,14 +54,14 @@ export interface SpreadValue {
   calls: number;
   /** The calls that held it, in the order the selection lists them, for the
    *  mark. Short of {@link calls} once {@link MAX_MARKED_PER_VALUE} bites. */
-  at: number[];
+  callIds: number[];
   /** Runs of consecutive calls that held it. One run is a phase the calls
    *  passed through; more is a value that came and went. */
   runs: number;
-  /** The point the first call that held it read at, so an address can be
-   *  resolved and an object opened. Each call read at its own point, so this is
+  /** The event id the first call that held it read at, so an address can be
+   *  resolved and an object opened. Each call read at its own event, so this is
    *  the one call the object is shown as. */
-  cut: number;
+  readAt: number;
 }
 
 /** One name, across the calls the row counts. */
@@ -110,14 +109,13 @@ interface Gathering {
 }
 
 /**
- * What the calls `frames` names held, compared across them.
+ * What the calls in `frameIds` held, compared across them.
  *
  * Returns null when the walk is abandoned (see {@link FrameBudgetOptions}).
  */
 async function compareFrames(
   store: LogStore,
-  frames: readonly number[],
-  index: VariableIndex | null,
+  frameIds: readonly number[],
   options: FrameBudgetOptions,
 ): Promise<AggregateVariables | null> {
   const tick = frameBudget(options);
@@ -132,23 +130,23 @@ async function compareFrames(
   // Every frame, with no `outermostEvents` dedupe — deliberately, and unlike
   // every other multi-frame read here. A recursive frame's nested call is its
   // own call with its own values, so dropping it would undercount the spread.
-  for (const eventIndex of frames) {
+  for (const eventId of frameIds) {
     // Per frame rather than every CHECK_EVERY: one read scans a whole frame's
     // lines, so 256 of them would overrun the slice many times over, and asking
     // the clock once per read costs nothing beside it.
     if (!(await tick())) {
       return null;
     }
-    const frame = frameVariablesFor(store, eventIndex, index, AS_READ);
+    const frame = frameVariablesFor(store, eventId, AS_READ);
     if (!frame) {
       continue;
     }
     truncated ||= frame.truncated;
     for (const row of frame.locals) {
-      hold(locals, row, eventIndex, read, frame.cut);
+      hold(locals, row, eventId, read, frame.readAt);
     }
     for (const row of frame.fields) {
-      hold(fields, row, eventIndex, read, frame.cut);
+      hold(fields, row, eventId, read, frame.readAt);
     }
     read++;
     if (frame.thisType) {
@@ -177,18 +175,18 @@ async function compareFrames(
 /**
  * Adds one call's reading of a name to what the walk holds for it.
  *
- * @param at - the call's eventIndex, for the mark
+ * @param callId - the call's event id, for the mark
  * @param ordinal - which call it is among those read, so a value's runs can be
  *   counted without holding the whole sequence
- * @param cut - the point that call read at, kept for the first call to hold a
+ * @param readAt - the event id that call read at, kept for the first call to hold a
  *   value so its object can be opened
  */
 function hold(
   into: Map<string, Gathering>,
   row: VariableRow,
-  at: number,
+  callId: number,
   ordinal: number,
-  cut: number,
+  readAt: number,
 ): void {
   let held = into.get(row.name);
   if (!held) {
@@ -226,8 +224,8 @@ function hold(
       value.runs++;
     }
     seen.previous = ordinal;
-    if (value.at.length < MAX_MARKED_PER_VALUE) {
-      value.at.push(at);
+    if (value.callIds.length < MAX_MARKED_PER_VALUE) {
+      value.callIds.push(callId);
     }
   } else if (held.byValue.size < MAX_VALUES_PER_NAME) {
     held.byValue.set(identity, {
@@ -236,9 +234,9 @@ function hold(
         address: row.address,
         objectAddress: row.objectAddress,
         calls: 1,
-        at: [at],
+        callIds: [callId],
         runs: 1,
-        cut,
+        readAt,
       },
       previous: ordinal,
     });
@@ -283,33 +281,32 @@ function comparedIn(log: object): WeakMap<object, AggregateVariables> {
   return made;
 }
 
-/** The memoised comparison for `frames` in `store`'s log, or undefined if it has
+/** The memoised comparison for `frameIds` in `store`'s log, or undefined if it has
  *  never been walked. Lets a caller render an already-walked selection without
  *  showing a placeholder first. */
 export function cachedAggregateVariables(
   store: LogStore,
-  frames: object,
+  frameIds: object,
 ): AggregateVariables | undefined {
-  return compared.get(store.log)?.get(frames);
+  return compared.get(store.log)?.get(frameIds);
 }
 
 /**
- * {@link compareFrames} memoised on the log and the `frames` array's identity. An
+ * {@link compareFrames} memoised on the log and the `frameIds` array's identity. An
  * abandoned walk is not memoised.
  */
 export async function aggregateVariablesFor(
   store: LogStore,
-  frames: readonly number[],
-  index: VariableIndex | null,
+  frameIds: readonly number[],
   options: FrameBudgetOptions,
 ): Promise<AggregateVariables | null> {
-  const held = cachedAggregateVariables(store, frames);
+  const held = cachedAggregateVariables(store, frameIds);
   if (held) {
     return held;
   }
-  const spread = await compareFrames(store, frames, index, options);
+  const spread = await compareFrames(store, frameIds, options);
   if (spread) {
-    comparedIn(store.log).set(frames, spread);
+    comparedIn(store.log).set(frameIds, spread);
   }
   return spread;
 }

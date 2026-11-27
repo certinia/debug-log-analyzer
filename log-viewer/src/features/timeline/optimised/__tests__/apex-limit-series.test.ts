@@ -2,45 +2,33 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { storeOf } from '#test-helpers/apexLog.js';
-import { emptyLimits } from '#test-helpers/limits.js';
-import { logStoreFor } from '../../../../core/log/LogStore.js';
+import { rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
+import type { HeatStripTimeSeries } from '../../types/flamechart.types.js';
 import { apexLimitSeries } from '../apex-limit-series.js';
 
-const aLog = (logIssues: ApexLog['logIssues']) =>
-  ({
-    children: [],
-    eventsById: [],
-    logIssues,
-    governorLimits: {
-      snapshots: [{ timestamp: 1_000, namespace: 'default', limits: emptyLimits() }],
-    },
-  }) as unknown as ApexLog;
-
-const seriesOf = (log: ApexLog) => logStoreFor(log).derive(apexLimitSeries);
+/** Two methods, with `between` written between them. */
+async function seriesOf(between: string): Promise<HeatStripTimeSeries> {
+  const { store } = await rawStoreOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.A.run()\n' +
+      '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.A.run()\n' +
+      between +
+      '09:18:22.6 (5000)|METHOD_ENTRY|[1]|01p|ns.B.run()\n' +
+      '09:18:22.6 (6000)|METHOD_EXIT|[1]|ns.B.run()\n',
+  );
+  return store.derive(apexLimitSeries);
+}
 
 describe('apexLimitSeries', () => {
   it('carries the spans the log recorded nothing in, for every surface that draws it', async () => {
-    const series = await seriesOf(
-      aLog([
-        {
-          type: 'skip',
-          startTime: 2_000,
-          endTime: 5_000,
-          summary: 'Skipped 12 lines',
-          description: 'The log hit its size cap',
-        },
-      ]),
-    );
+    const series = await seriesOf('*** Skipped 12345 bytes of detailed log\n');
 
     expect(series.gaps).toHaveLength(1);
     expect(series.gaps?.[0]).toMatchObject({ startTime: 2_000, endTime: 5_000 });
   });
 
   it('reads the usage of statements and allocations nested at any depth', async () => {
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|HEAP_ALLOCATE|[2]|Bytes:40\n' +
         '09:18:22.6 (1200)|SOQL_EXECUTE_BEGIN|[3]|Aggregations:0|SELECT Id FROM Account\n' +
@@ -57,7 +45,7 @@ describe('apexLimitSeries', () => {
 
   it('folds readings tied in time in the order a last-child-first walk meets them', async () => {
     // The statement is the later sibling, so its count lands before the block's own report.
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|Outer.run()\n' +
         '09:18:22.6 (1100)|LIMIT_USAGE|[2]|SOQL|5|100\n' +
         '09:18:22.6 (1100)|SOQL_EXECUTE_BEGIN|[3]|Aggregations:0|SELECT Id FROM Account\n' +
@@ -71,6 +59,6 @@ describe('apexLimitSeries', () => {
   });
 
   it('reports no gaps for a log that recorded throughout', async () => {
-    expect((await seriesOf(aLog([]))).gaps).toEqual([]);
+    expect((await seriesOf('')).gaps).toEqual([]);
   });
 });

@@ -8,7 +8,7 @@ import { describe, expect, it } from '@jest/globals';
 // The header and the inspector pull in every grid, which this suite does not need.
 jest.mock('../AppHeader.js', () => ({}));
 jest.mock('../../../components/LogInspector.js', () => ({}));
-jest.mock('../../../core/messaging/VSCodeExtensionMessenger.js', () => ({
+jest.mock('#core/messaging/VSCodeExtensionMessenger.js', () => ({
   vscodeMessenger: { request: jest.fn(() => new Promise(() => {})), send: jest.fn() },
   VSCodeExtensionMessenger: { listen: jest.fn(() => () => {}) },
 }));
@@ -51,6 +51,18 @@ describe('a log that could not be read', () => {
     await el._handleLogFetch({ logData: MINIMAL_LOG });
 
     expect(statusOf(el)).toBe('ready');
+  });
+
+  // An empty body is still the log: fetching the URI instead fails where the webview cannot read it.
+  it('loads an empty log body without reading the log URI', async () => {
+    const el = await mount();
+
+    await el._handleLogFetch({ logUri: 'memfs:/unreadable.log', logData: '' });
+
+    expect({ status: statusOf(el), problems: el.logProblems }).toEqual({
+      status: 'ready',
+      problems: [],
+    });
   });
 
   it('paints the region empty, so its first text is a change a reader is told about', async () => {

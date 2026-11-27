@@ -14,19 +14,19 @@ import {
   type AggregateVariables,
   type SpreadValue,
   type VariableSpread,
-} from '../core/log/aggregateVariables.js';
+} from '#core/log/aggregateVariables.js';
 import {
   frameVariablesFor,
   variableIndex,
   type FrameVariables,
   type VariableIndex,
-} from '../core/log/frameVariables.js';
-import { TeardownController } from '../core/events/TeardownController.js';
-import { describeLevelGap } from '../core/log/levelCapabilities.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '../core/log/variableValue.js';
-import { formatInteger } from '../core/utility/Util.js';
+} from '#core/log/frameVariables.js';
+import { TeardownController } from '#core/events/TeardownController.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '#core/log/variableValue.js';
+import { formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { bleedRowStyles } from '../styles/revealRow.styles.js';
@@ -60,12 +60,12 @@ type Valued = Shown & { open: boolean };
 @customElement('variables-detail')
 export class VariablesDetail extends LitElement {
   @property({ type: Number })
-  eventIndex = -1;
+  eventId = -1;
 
   /** The frames a merged row is, where the selection is one: the scope every
-   *  call it counts held. Null for a single frame, which `eventIndex` names. */
+   *  call it counts held. Null for a single frame, which `eventId` names. */
   @property({ attribute: false })
-  frames: number[] | null = null;
+  frameIds: number[] | null = null;
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
@@ -288,7 +288,7 @@ export class VariablesDetail extends LitElement {
   /** The selection merges calls, so the section compares them rather than
    *  reading one frame. */
   private get _isAggregate(): boolean {
-    return (this.frames?.length ?? 0) > 1;
+    return (this.frameIds?.length ?? 0) > 1;
   }
 
   /**
@@ -296,11 +296,11 @@ export class VariablesDetail extends LitElement {
    *
    * A merged row that comes down to a single frame is that frame, never the
    * calls it counts: a bottom-up caller row counts its callee's calls, so
-   * `eventIndex` names one of those and reading it would show the called
+   * `eventId` names one of those and reading it would show the called
    * method's scope under a row that names the caller.
    */
-  private get _readIndex(): number {
-    return this.frames?.length === 1 ? this.frames[0]! : this.eventIndex;
+  private get _readId(): number {
+    return this.frameIds?.length === 1 ? this.frameIds[0]! : this.eventId;
   }
 
   /** The index, but only once the log has a write in it. A log captured at
@@ -324,8 +324,8 @@ export class VariablesDetail extends LitElement {
     // Only what the selection is made of, so a disclosure or a key does not
     // re-read the log.
     const reselected =
-      changed.has('eventIndex') ||
-      changed.has('frames') ||
+      changed.has('eventId') ||
+      changed.has('frameIds') ||
       changed.has('logStore') ||
       changed.has('_index');
     if (reselected) {
@@ -335,7 +335,7 @@ export class VariablesDetail extends LitElement {
       // unread.
       this._frame =
         !this._isAggregate && this.logStore && this._index
-          ? frameVariablesFor(this.logStore, this._readIndex, this._index)
+          ? frameVariablesFor(this.logStore, this._readId)
           : null;
       // The comparison is resolved here, not in `updated`: a walk that runs a
       // step later would let this pass rebuild and render the *previous* row's
@@ -352,14 +352,14 @@ export class VariablesDetail extends LitElement {
   /** The frames to compare, or null where the section reads one frame or the
    *  log records nothing to compare. */
   private _compareKey(): readonly number[] | null {
-    return this._isAggregate && this.logStore && this._readable ? this.frames : null;
+    return this._isAggregate && this.logStore && this._readable ? this.frameIds : null;
   }
 
   /** A comparison already walked, so a re-selection shows no placeholder. */
   private _held(): AggregateVariables | null {
-    const frames = this._compareKey();
+    const frameIds = this._compareKey();
     const store = this.logStore;
-    return frames && store ? (cachedAggregateVariables(store, frames) ?? null) : null;
+    return frameIds && store ? (cachedAggregateVariables(store, frameIds) ?? null) : null;
   }
 
   /** The rows on screen, and where each one sits, from the scope and what is
@@ -372,10 +372,10 @@ export class VariablesDetail extends LitElement {
       ? // Read through what is held: a walk that has yet to answer shows its
         // placeholder, never the last row's spread.
         this._spread
-        ? toSpreadRows(this._spread, isOpen, (cut) => this._viewAt(cut))
+        ? toSpreadRows(this._spread, isOpen, (readAt) => this._viewAt(readAt))
         : []
       : frame
-        ? toTreeRows(frame, isOpen, this._viewAt(frame.cut))
+        ? toTreeRows(frame, isOpen, this._viewAt(frame.readAt))
         : [];
     this._at = new Map(this._rows.map((row, at) => [row.id, at]));
     // Fixed here, so neither is rescanned on every render.
@@ -396,11 +396,11 @@ export class VariablesDetail extends LitElement {
   });
 
   /** The log bound to one point in it, held per point. */
-  private _viewAt(cut: number): Lookups {
-    let held = this._views.get(cut);
+  private _viewAt(readAt: number): Lookups {
+    let held = this._views.get(readAt);
     if (!held) {
-      held = this._index?.viewAt(cut) ?? {};
-      this._views.set(cut, held);
+      held = this._index?.viewAt(readAt) ?? {};
+      this._views.set(readAt, held);
     }
     return held;
   }
@@ -411,7 +411,7 @@ export class VariablesDetail extends LitElement {
     }
     // Comparing reads every call, so only a changed selection - or one we have
     // yet to resolve - earns the walk.
-    if (changed.has('frames') || changed.has('_index') || this._spreadKey === undefined) {
+    if (changed.has('frameIds') || changed.has('_index') || this._spreadKey === undefined) {
       void this._compare();
     }
     if (this._takeFocus) {
@@ -446,30 +446,29 @@ export class VariablesDetail extends LitElement {
     if (!index) {
       return note('This log records no variable assignments.');
     }
-    return this._isAggregate ? this._spreadTree(index) : this._frameTree(index);
+    return this._isAggregate ? this._spreadTree() : this._frameTree();
   }
 
   /** One frame: its locals, its object's fields and the statics in scope. */
-  private _frameTree(index: VariableIndex): TemplateResult {
+  private _frameTree(): TemplateResult {
     const frame = this._frame;
     if (!frame || !this._rows.length) {
       return note('The log records no variables in scope here.');
     }
-    return this._tree([frame.truncated && TRUNCATED_NOTE, index.capped && HELD_NOTE]);
+    return this._tree([frame.truncated && TRUNCATED_NOTE]);
   }
 
   /**
    * A merged row: what its calls held, compared. Which name varied is the
    * reading, and every value it lists names the calls that held it.
    */
-  private _spreadTree(index: VariableIndex): TemplateResult {
+  private _spreadTree(): TemplateResult {
     const spread = this._spread;
     if (!spread) {
-      return note(`Comparing ${callsHeld(this.frames?.length ?? 0)}…`);
+      return note(`Comparing ${callsHeld(this.frameIds?.length ?? 0)}…`);
     }
     return this._tree([
       spread.truncated && TRUNCATED_NOTE,
-      index.capped && HELD_NOTE,
       spread.capped && `Over ${formatInteger(MAX_VALUES_PER_NAME)} values, so some are not listed.`,
       this._partlyMarked &&
         `A value held by over ${formatInteger(MAX_MARKED_PER_VALUE)} calls marks that many of them.`,
@@ -521,14 +520,14 @@ export class VariablesDetail extends LitElement {
   private async _compare(): Promise<void> {
     const store = this.logStore;
     const index = this._readable;
-    const frames = this._compareKey();
-    if (frames === this._spreadKey) {
+    const frameIds = this._compareKey();
+    if (frameIds === this._spreadKey) {
       return;
     }
-    this._spreadKey = frames;
+    this._spreadKey = frameIds;
     this._walk?.abort();
     const walk = (this._walk = new AbortController());
-    if (!frames || !store || !index) {
+    if (!frameIds || !store || !index) {
       return;
     }
     // `willUpdate` already answered from the memo, so only an unwalked
@@ -536,7 +535,7 @@ export class VariablesDetail extends LitElement {
     if (this._spread) {
       return;
     }
-    const spread = await aggregateVariablesFor(store, frames, index, { signal: walk.signal });
+    const spread = await aggregateVariablesFor(store, frameIds, { signal: walk.signal });
     if (this._walk !== walk) {
       return;
     }
@@ -732,13 +731,13 @@ export class VariablesDetail extends LitElement {
     if (row.address === null || row.resolved || row.assembled) {
       return null;
     }
-    if (row.laterAt === null) {
+    if (row.laterWriteId === null) {
       return {
         text: 'no value recorded',
         why: 'The log holds no value for this address, at any point.',
       };
     }
-    const stack = this.logStore?.stackByEventIndex(row.laterAt) ?? [];
+    const stack = this.logStore?.stackById(row.laterWriteId) ?? [];
     const where = stack[stack.length - 1]?.text;
     return {
       text: 'recorded later',
@@ -756,7 +755,7 @@ export class VariablesDetail extends LitElement {
     // section answers a merged row with aggregated figures, and dropping onto
     // one of its calls would throw away the reading the reader came for.
     if (row.kind === 'spread-value') {
-      dispatchInspectorLocate(this, row.held.at, true);
+      dispatchInspectorLocate(this, row.held.callIds, true);
     }
     if (row.expandable) {
       this._toggle(row.id, !row.open);
@@ -767,7 +766,7 @@ export class VariablesDetail extends LitElement {
    *  over it. Nothing is selected and no section changes. */
   private _hover(row: VariableTreeRow, over: boolean): void {
     if (row.kind === 'spread-value') {
-      dispatchInspectorLocate(this, over ? row.held.at : []);
+      dispatchInspectorLocate(this, over ? row.held.callIds : []);
     }
   }
 
@@ -955,17 +954,13 @@ function lastSegment(className: string): string {
 
 /** A name holds a value whose mark names fewer calls than held it. */
 function partlyMarked(row: VariableSpread): boolean {
-  return row.values.some((value) => value.at.length < value.calls);
+  return row.values.some((value) => value.callIds.length < value.calls);
 }
 
 /** The frame or a caller ran past the end of a truncated log. Shared: it is the
  *  same fact at either scope. */
 const TRUNCATED_NOTE =
   'The log is truncated here, so a write may be unrecorded rather than absent.';
-
-/** The index dropped writes past a cap, so an answer may be short of what the
- *  log recorded. Shared: it is the same fact at either scope. */
-const HELD_NOTE = 'Too many assignments to hold them all, so some values are missing.';
 
 /** A comparison reads each value at the point its first call stood, so an
  *  object it opens is that one call's reading. */

@@ -3,7 +3,7 @@
  */
 import { html, type ReactiveControllerHost, type TemplateResult } from 'lit';
 
-import { SubscriptionController } from '../core/events/SubscriptionController.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
 import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';

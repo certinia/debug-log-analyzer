@@ -26,8 +26,8 @@ jest.mock('../../grid/columns.js', () => ({
 }));
 jest.mock('../../utils/Aggregation.js', () => ({
   ...jest.requireActual<object>('../../utils/Aggregation.js'),
-  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[3]),
-  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[3]),
+  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[1], args[3]),
+  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[1], args[3]),
 }));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
@@ -44,11 +44,14 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { storeOf } from '#test-helpers/apexLog.js';
+import { idOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
+import { columnWidthItems } from '../../../../components/grid/columnWidthMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
-import { eventBus } from '../../../../core/events/EventBus.js';
-import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
+import { eventBus } from '#core/events/EventBus.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
+import { LogStore, logStoreFor } from '#core/log/LogStore.js';
+import { MergedTree } from '../../grid/mergedRows.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which view each build made, in order. */
@@ -63,36 +66,84 @@ let applySettings: (settings: object) => void = () => {};
 /** The signals the merged builds were given, in order. */
 let buildSignals: (AbortSignal | undefined)[] = [];
 
-function heldBuild(options: unknown): Promise<object[]> {
+function heldBuild(options: unknown, rowsByKey: unknown): Promise<object[]> {
   buildSignals.push((options as { signal?: AbortSignal } | undefined)?.signal);
   if (!holdBuilds) {
     return Promise.resolve([]);
   }
-  return new Promise((resolve) => (finishBuild = resolve));
+  // The real build fills the rows by key as it makes them; this one is handed finished roots.
+  const byKey = rowsByKey as Map<number, { first: BottomUpRow | null }> | undefined;
+  return new Promise(
+    (resolve) =>
+      (finishBuild = (roots) => {
+        const pending = [...(roots as BottomUpRow[])];
+        for (let row = pending.pop(); row; row = pending.pop()) {
+          if (byKey) {
+            row._nextOfKey = byKey.get(row._keyId)?.first ?? null;
+            byKey.set(row._keyId, { first: row });
+          }
+          pending.push(...(row._children ?? []));
+        }
+        resolve(roots);
+      }),
+  );
 }
+
+/** The hidden-row bar's Clear, by its accessible name. */
+const CLEAR_BUTTON = '[aria-label="Clear filters and go to the hidden row"]';
 
 /** The grids in the view's DOM. */
 function grids(view: CalltreeView): Element[] {
   return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
 }
 
-function apexLog(): ApexLog {
-  return {
-    children: [],
-    eventsById: [],
-    namespaces: [],
-    governorLimits: null,
-  } as unknown as ApexLog;
+/** A log of no events. */
+async function emptyLog(): Promise<ApexLog> {
+  return (await rawStoreOf('')).log;
 }
 
-async function mountView(log: ApexLog = apexLog()): Promise<CalltreeView> {
+async function mountView(log?: ApexLog): Promise<CalltreeView> {
   const view = new CalltreeView();
   document.body.append(view);
   await view.updateComplete;
-  view.logStore = logStoreFor(log);
+  view.logStore = logStoreFor(log ?? (await emptyLog()));
   await view.updateComplete;
   await settle();
   return view;
+}
+
+function widget<E extends Element = HTMLElement>(view: CalltreeView, selector: string): E {
+  const found = view.renderRoot.querySelector<E>(selector);
+  if (!found) {
+    throw new Error(`no ${selector}`);
+  }
+  return found;
+}
+
+/** Sets a toolbar filter as a user does, through its control. */
+const filterBy = {
+  namespaces: (view: CalltreeView, selected: string[]) =>
+    widget(view, 'datagrid-facet-filter[label="Namespace"]').dispatchEvent(
+      new CustomEvent('datagrid-facet-change', { detail: { selected } }),
+    ),
+  range: (view: CalltreeView, label: 'Total Time' | 'Self Time', start: number | null) =>
+    widget(view, `datagrid-range-filter[label="${label}"]`).dispatchEvent(
+      new CustomEvent('datagrid-range-change', { detail: { range: { start, end: null } } }),
+    ),
+  type: (view: CalltreeView, value: string) => {
+    const select = widget<HTMLElement & { value: string }>(view, 'vs-select[label="Type"]');
+    select.value = value;
+    select.dispatchEvent(new Event('change'));
+  },
+  toggle: (view: CalltreeView, title: 'Show Detail Events' | 'Show Debug Statements Only') =>
+    widget<HTMLButtonElement>(view, `button[title="${title}"]`).click(),
+};
+
+/** The `aria-pressed` of the view's filter toggle labelled `label`. */
+function togglePressed(view: CalltreeView, label: string): string | null | undefined {
+  return [...view.renderRoot.querySelectorAll('button.pill-toggle')]
+    .find((button) => button.textContent?.trim() === label)
+    ?.getAttribute('aria-pressed');
 }
 
 describe('calltree-view table lifetime', () => {
@@ -117,13 +168,12 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('gives the grid it has the rows of a new log, and keeps its filters', async () => {
-    view.namespaceSelected = ['ns'];
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     const grid = view.timeOrderGrid;
     const filters = [...(grid?.filters ?? [])];
     const source = grid?.source;
 
-    view.logStore = logStoreFor(apexLog());
+    view.logStore = logStoreFor(await emptyLog());
     await view.updateComplete;
     await settle();
 
@@ -147,8 +197,7 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('rebuilds under the filters the view was left with', async () => {
-    view.namespaceSelected = ['ns'];
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     const onShow = view.timeOrderGrid?.filters.length;
     expect(onShow).toBeGreaterThan(0);
 
@@ -161,16 +210,13 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('keeps a filter that did not change, so the grid keeps its work for it', () => {
-    view.namespaceSelected = ['ns'];
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     const before = [...(view.timeOrderGrid?.filters ?? [])];
 
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     expect(view.timeOrderGrid?.filters).toEqual(before);
 
-    view._handleTotalTimeRange(
-      new CustomEvent('range', { detail: { range: { start: 1, end: null } } }),
-    );
+    filterBy.range(view, 'Total Time', 1);
     // Equal filters share their test function, so this holds only for the same objects.
     expect(view.timeOrderGrid?.filters).toEqual(expect.arrayContaining(before));
     expect(view.timeOrderGrid?.filters).toHaveLength(before.length + 1);
@@ -233,7 +279,7 @@ describe('calltree-view table lifetime', () => {
       );
       const back = view._setViewMode(mode);
       await settle();
-      finish([{ id: 1, _pathId: 1 }]);
+      finish([{ id: 1, _pathId: 1, type: 'METHOD_ENTRY' }]);
       await back;
       off();
 
@@ -252,6 +298,15 @@ describe('calltree-view table lifetime', () => {
     await settle();
 
     expect(buildSignals.map((signal) => signal?.aborted)).toEqual([true, false]);
+  });
+
+  // A copy of its own would hold every row a second time beside the Analysis view.
+  it('shows the Bottom-Up rows every view of the log shares', async () => {
+    await view._setViewMode('bottom-up');
+    await settle();
+    const shared = await MergedTree.bottomUp(view.logStore!); // mountView set it
+
+    expect(view.bottomUpGrid?.source?.roots).toBe(shared?.source.roots);
   });
 
   it('offers Group only in bottom up', async () => {
@@ -327,7 +382,7 @@ describe('calltree-view table lifetime', () => {
   });
 
   const toolbarClick = (label: string) =>
-    view.renderRoot.querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)?.click();
+    view.renderRoot.querySelector<HTMLElement>(`toolbar-action[label="${label}"]`)?.click();
 
   it.each([
     ['time-order', 'timeOrderGrid'],
@@ -344,7 +399,7 @@ describe('calltree-view table lifetime', () => {
       }
       const copy = jest.spyOn(grid, 'copy').mockResolvedValue(undefined);
       toolbarClick('Export to CSV');
-      toolbarClick('Copy to clipboard');
+      toolbarClick('Copy to Clipboard');
 
       expect(exportCsv).toHaveBeenCalledWith(grid, `call-tree-${mode}.csv`);
       expect(copy).toHaveBeenCalled();
@@ -361,8 +416,28 @@ describe('calltree-view table lifetime', () => {
     expect(show).toHaveBeenCalledTimes(1);
   });
 
+  // One menu serves the three grids, so after a switch it must size the grid on show, not Time Order.
+  it('sizes the columns of the grid on show after a view switch', async () => {
+    await view._setViewMode('bottom-up');
+    await settle();
+    const sized = (grid: { autosizeColumns(): void } | null) =>
+      grid && jest.spyOn(grid, 'autosizeColumns').mockImplementation(() => {});
+    const timeOrder = sized(view.timeOrderGrid);
+    const bottomUp = sized(view.bottomUpGrid);
+    const autosizeAll = columnWidthItems(null).find(
+      (item) => item.label === 'Autosize All Columns',
+    );
+
+    view.renderRoot
+      .querySelector('context-menu')
+      ?.dispatchEvent(new CustomEvent('menu-select', { detail: { itemId: autosizeAll?.id } }));
+
+    expect(bottomUp).toHaveBeenCalled();
+    expect(timeOrder).not.toHaveBeenCalled();
+  });
+
   it('builds aggregated as a grid, under the filters in force', async () => {
-    view.namespaceSelected = ['ns'];
+    filterBy.namespaces(view, ['ns']);
     await view._setViewMode('aggregated');
     await settle();
 
@@ -399,90 +474,210 @@ describe('calltree-view category colorize', () => {
     expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(false);
     expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(false);
   });
+
+  // A time-order node holds only its row, so the strip read no category and showed none.
+  it('colours a time-order row by its category', async () => {
+    const { log, store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    view.remove();
+    view = await mountView(log);
+    const row = (await store.logIndex()).rowOf(idOf(log, 'ns.Outer.run()'));
+
+    expect(view.timeOrderGrid?.rowClass?.({ row })).toBe('cat-apex');
+  });
 });
 
 describe('calltree-view merged filters', () => {
-  // Outer runs 5 ms; its query and debug line take next to none.
-  const { log } = storeOf(
-    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-      '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
-      '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
-      '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
-      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-  );
-  const paths = (): ReturnType<LogStore['keyPathIds']> => logStoreFor(log).keyPathIds();
+  // Outer runs 5 ms; its query, debug line and exception take next to none.
+  let store: LogStore;
+  let index: LogIndex;
   const all = <R extends { _children?: R[] | null }>(of: readonly R[]): R[] =>
     of.flatMap((row) => [row, ...all(row._children ?? [])]);
   const rowsOf = {
-    aggregated: () => all(toAggregatedCallTree(log.children, paths())),
-    'bottom-up': () => all(toBottomUpTree(log.children, paths())),
+    aggregated: () => all(toAggregatedCallTree(index, store)),
+    'bottom-up': () => all(toBottomUpTree(index, store)),
   };
   const gridOf = (view: CalltreeView, mode: keyof typeof rowsOf) =>
     mode === 'aggregated' ? view.aggregatedGrid : view.bottomUpGrid;
+  const filtersOf = (view: CalltreeView, mode: 'time-order' | keyof typeof rowsOf) =>
+    ((mode === 'time-order' ? view.timeOrderGrid : gridOf(view, mode))?.filters ?? []) as {
+      test: (row: object) => boolean;
+    }[];
   /** The rows each filter passes on its own; ancestors kept for a match are the grid's job. */
-  const passing = (view: CalltreeView, mode: keyof typeof rowsOf): string[] => {
-    const filters = (gridOf(view, mode)?.filters ?? []) as { test: (row: object) => boolean }[];
-    return rowsOf[mode]()
-      .filter((row) => filters.every((filter) => filter.test(row)))
-      .map((row) => row.text);
+  const kept = (view: CalltreeView, mode: keyof typeof rowsOf) => {
+    const filters = filtersOf(view, mode);
+    return rowsOf[mode]().filter((row) => filters.every((filter) => filter.test(row)));
+  };
+  const passing = (view: CalltreeView, mode: keyof typeof rowsOf): string[] =>
+    kept(view, mode).map((row) => row.text);
+
+  /** The types of the rows each filter of `mode` passes on its own. */
+  const keptTypes = (
+    view: CalltreeView,
+    mode: 'time-order' | keyof typeof rowsOf,
+  ): (string | undefined)[] => {
+    if (mode !== 'time-order') {
+      return kept(view, mode).map((row) => row.type);
+    }
+    const filters = filtersOf(view, mode);
+    return Array.from({ length: index.rowCount }, (_, row) => ({ row }))
+      .filter((node) => filters.every((filter) => filter.test(node)))
+      .map(({ row }) => store.log.event(index.eventId[row]!)?.type);
+  };
+  const detailsPressed = async (view: CalltreeView): Promise<string | null | undefined> => {
+    await view.updateComplete;
+    return togglePressed(view, 'Details');
   };
 
   let view: CalltreeView;
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    view = await mountView(log);
-    view.filterState.showDetails = true;
+    ({ store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
+        '09:18:22.6 (4500)|VARIABLE_ASSIGNMENT|[3]|count|1\n' +
+        '09:18:22.6 (5000)|EXCEPTION_THROWN|[4]|System.NullPointerException: boom\n' +
+        '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    ));
+    index = await store.logIndex();
+    view = await mountView(store.log);
+    filterBy.toggle(view, 'Show Detail Events');
   });
 
   afterEach(() => {
     view.remove();
   });
 
+  // Each view takes its own Details filter: Bottom-Up shows frames only.
+  it.each([
+    ['time-order', true],
+    ['aggregated', true],
+    ['bottom-up', false],
+  ] as const)(
+    'hides the debug line from %s with Details off, and keeps the exception: %s',
+    async (mode, keepsException) => {
+      await view._setViewMode(mode);
+      filterBy.toggle(view, 'Show Detail Events');
+      const kept = keptTypes(view, mode);
+
+      expect(kept).toContain('SOQL_EXECUTE_BEGIN');
+      expect(kept).not.toContain('USER_DEBUG');
+      expect(kept.includes('EXCEPTION_THROWN')).toBe(keepsException);
+    },
+  );
+
   it.each(['aggregated', 'bottom-up'] as const)(
     'filters %s rows on their own total time, self time and namespace',
     async (mode) => {
-      const range = (start: number | null) =>
-        new CustomEvent('range', { detail: { range: { start, end: null } } });
       await view._setViewMode(mode);
-      view._handleTotalTimeRange(range(1));
+      filterBy.range(view, 'Total Time', 1);
       expect(passing(view, mode)).toContain('ns.Outer.run()');
       expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
 
-      view._handleTotalTimeRange(range(null));
-      view._handleSelfTimeRange(range(1));
+      filterBy.range(view, 'Total Time', null);
+      filterBy.range(view, 'Self Time', 1);
       expect(passing(view, mode)).toContain('ns.Outer.run()');
       expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
 
-      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      filterBy.namespaces(view, ['other']);
       expect(passing(view, mode)).toEqual([]);
     },
   );
 
   it('filters aggregated rows on their type, and on debug only', async () => {
     await view._setViewMode('aggregated');
-    view._handleTypeFilter({ target: { value: 'SOQL_EXECUTE_BEGIN' } } as unknown as Event);
+    filterBy.type(view, 'SOQL_EXECUTE_BEGIN');
     expect(passing(view, 'aggregated')).toEqual(['SELECT Id FROM Account']);
 
-    view._handleDebugOnlyChange();
+    filterBy.toggle(view, 'Show Debug Statements Only');
     expect(passing(view, 'aggregated')).toEqual(['DEBUG | hello']);
+
+    filterBy.toggle(view, 'Show Debug Statements Only');
+    filterBy.type(view, 'All');
+    expect(passing(view, 'aggregated')).toEqual(
+      expect.arrayContaining(['ns.Outer.run()', 'SELECT Id FROM Account']),
+    );
+  });
+
+  it('clears the type filter when the selected type is picked again', async () => {
+    await view._setViewMode('aggregated');
+    const picker = view.renderRoot.querySelector('vs-select[label="Type"]');
+
+    expect(picker?.getAttribute('deselectvalue')).toBe('All');
+  });
+
+  it('turns Details on for a detail type picked with Details off, and off again on All', async () => {
+    await view._setViewMode('time-order');
+    filterBy.toggle(view, 'Show Detail Events');
+
+    filterBy.type(view, 'USER_DEBUG');
+    expect(await detailsPressed(view)).toBe('true');
+    expect(keptTypes(view, 'time-order')).toContain('USER_DEBUG');
+
+    filterBy.type(view, 'All');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('leaves Details off when All is picked with Details off', async () => {
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'All');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('keeps Details on from one detail type to another, and turns it off after', async () => {
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'USER_DEBUG');
+    filterBy.type(view, 'VARIABLE_ASSIGNMENT');
+    expect(await detailsPressed(view)).toBe('true');
+
+    filterBy.type(view, 'All');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('leaves Details off for a frame type, which shows without it', async () => {
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'SOQL_EXECUTE_BEGIN');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('leaves Details on after a detail type when it was on before', async () => {
+    filterBy.type(view, 'USER_DEBUG');
+    filterBy.type(view, 'All');
+    expect(await detailsPressed(view)).toBe('true');
+  });
+
+  it('keeps Details on when it is turned off and on by hand while a detail type is picked', async () => {
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'USER_DEBUG');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'All');
+    expect(await detailsPressed(view)).toBe('true');
   });
 });
 
 describe('calltree-view inspector reveal', () => {
-  // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too.
-  const { log } = storeOf(
-    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-      '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
-      '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
-      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-  );
+  // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too. The debug
+  // line is a detail, which Bottom-Up hides while Details is off.
+  let store: LogStore;
   let view: CalltreeView;
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     holdBuilds = true;
-    view = await mountView(log);
+    ({ store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1500)|USER_DEBUG|[2]|DEBUG|hello\n' +
+        '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+        '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+        '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    ));
+    view = await mountView(store.log);
   });
 
   afterEach(() => {
@@ -490,26 +685,133 @@ describe('calltree-view inspector reveal', () => {
     view.remove();
   });
 
-  it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
+  const note = () => view.renderRoot.querySelector('.hidden-note');
+  const bucketOf = (roots: BottomUpRow[], text: string) =>
+    roots.find((row) => row.text === text)?.id;
+
+  /** Shows Bottom-Up, built from the real log, and returns its rows. */
+  async function toBottomUp(): Promise<BottomUpRow[]> {
     const switched = view._setViewMode('bottom-up');
     await settle();
-    const roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
+    const roots = toBottomUpTree(await store.logIndex(), store);
     finishBuild?.(roots);
     await switched;
+    return roots;
+  }
+
+  function hideEveryNamespace(): void {
+    view.renderRoot.querySelector('datagrid-facet-filter[label="Namespace"]')?.dispatchEvent(
+      new CustomEvent('datagrid-facet-change', {
+        detail: { selected: ['other'] },
+        bubbles: true,
+      }),
+    );
+  }
+
+  function reveal(text: string): void {
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventId: idOf(store.log, text) });
+  }
+
+  it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
+    const roots = await toBottomUp();
     const grid = view.bottomUpGrid;
     if (!grid) {
       throw new Error('no bottom-up grid');
     }
-    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
-    const all = (events: ApexLog['children']): ApexLog['children'] =>
-      events.flatMap((e) => [e, ...all(e.children)]);
-    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
+    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue('selected');
 
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: outer?.eventIndex ?? -1 });
+    reveal('ns.Outer.run()');
     await settle();
 
-    const bucket = roots.find((row) => row.text === 'ns.Outer.run()');
-    expect(goTo).toHaveBeenCalledWith([bucket?.id], { scrollIfVisible: false });
+    expect(goTo).toHaveBeenCalledWith([bucketOf(roots, 'ns.Outer.run()')], {
+      scrollIfVisible: false,
+    });
+  });
+
+  // The reveal looked for the new log's bucket in the old log's tree, and said filters hid it.
+  it('reveals a Bottom-Up bucket of a new log once its tree is built, with no bar', async () => {
+    await toBottomUp();
+    const { store: next } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Other.do()\n' +
+        '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.Other.do()\n',
+    );
+    view.logStore = next;
+    eventBus.emit('inspector:reveal', {
+      source: 'calltree',
+      eventId: idOf(next.log, 'ns.Other.do()'),
+    });
+    await settle();
+    const roots = toBottomUpTree(await next.logIndex(), next);
+    finishBuild?.(roots);
+    await settle();
+    await view.updateComplete;
+
+    expect(view.bottomUpGrid?.selectedKey).toBe(bucketOf(roots, 'ns.Other.do()'));
+    expect(note()).toBeNull();
+  });
+
+  // #1211: a finding in a filtered-out namespace selected nothing, with no word why. Clear
+  // then went through the go-to path, which switches to Time Order.
+  it('says so when a reveal names a row the filters hide, and Clear reaches it in the view on show', async () => {
+    const roots = await toBottomUp();
+    hideEveryNamespace();
+
+    reveal('ns.Outer.run()');
+    await settle();
+    await view.updateComplete;
+    expect(note()?.textContent).toContain('Row hidden by current filters');
+
+    note()?.querySelector<HTMLElement>(CLEAR_BUTTON)?.click();
+    await settle();
+    await view.updateComplete;
+
+    expect(view.viewMode).toBe('bottom-up');
+    expect(view.bottomUpGrid?.selectedKey).toBe(bucketOf(roots, 'ns.Outer.run()'));
+    expect(note()).toBeNull();
+  });
+
+  // Only Time Order knew Details could hide a row, so a grouped view left a detail hidden.
+  it('turns Details on, with no bar, to reveal a Bottom-Up bucket only Details hides', async () => {
+    const roots = await toBottomUp();
+
+    reveal('DEBUG | hello');
+    await settle();
+    await view.updateComplete;
+
+    const details = [...view.renderRoot.querySelectorAll('button.pill-toggle')].find(
+      (button) => button.textContent?.trim() === 'Details',
+    );
+    expect(details?.getAttribute('aria-pressed')).toBe('true');
+    expect(view.bottomUpGrid?.selectedKey).toBe(bucketOf(roots, 'DEBUG | hello'));
+    expect(note()).toBeNull();
+  });
+
+  // The bar of a reveal named a row of the view left behind, and Clear reset filters for it.
+  it('drops the bar when the view changes', async () => {
+    await toBottomUp();
+    hideEveryNamespace();
+    reveal('ns.Outer.run()');
+    await settle();
+    await view.updateComplete;
+    expect(note()).not.toBeNull();
+
+    await view._setViewMode('time-order');
+    await view.updateComplete;
+
+    expect(note()).toBeNull();
+  });
+
+  // A reveal still running when the view changed put its bar over the new view.
+  it('shows no bar from a reveal the view changed under', async () => {
+    await toBottomUp();
+    hideEveryNamespace();
+
+    reveal('ns.Outer.run()');
+    await view._setViewMode('time-order');
+    await settle();
+    await view.updateComplete;
+
+    expect(note()).toBeNull();
   });
 });
 
@@ -522,18 +824,338 @@ describe('calltree-view go to row', () => {
 
   it('puts keyboard focus on the grid, so its keys work at once', async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    const { log } = storeOf(
+    const { log } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
     view = await mountView(log);
-    const all = (events: ApexLog['children']): ApexLog['children'] =>
-      events.flatMap((e) => [e, ...all(e.children)]);
-    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
 
-    await view._goToRow(outer?.eventIndex ?? -1);
+    await view._goToRow(idOf(log, 'ns.Outer.run()'));
 
     expect((view.renderRoot as ShadowRoot).activeElement === view.timeOrderGrid).toBe(true);
+  });
+
+  describe('to a row the filters hide', () => {
+    // Debug Only keeps Outer as the parent of its debug line, and hides Inner. Details, off by
+    // default, hides the debug line: it is a detail.
+    const LOG =
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (1100)|USER_DEBUG|[2]|DEBUG|hello\n' +
+      '09:18:22.6 (1200)|METHOD_ENTRY|[3]|01p|ns.Inner.go()\n' +
+      '09:18:22.6 (1300)|METHOD_EXIT|[3]|ns.Inner.go()\n' +
+      '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+
+    const note = () => view.renderRoot.querySelector('.hidden-note');
+    const announced = () => view.renderRoot.querySelector('[role="status"]')?.textContent?.trim();
+    const pressed = (label: string) => togglePressed(view, label);
+    const pressClear = async () => {
+      note()!.querySelector<HTMLElement>(CLEAR_BUTTON)!.click(); // each caller has just shown the note
+      await settle();
+      await view.updateComplete;
+    };
+
+    async function openWithDebugOnly(log: ApexLog): Promise<void> {
+      view = await mountView(log);
+      await view._goToRow(idOf(log, 'ns.Outer.run()'));
+      filterBy.toggle(view, 'Show Debug Statements Only');
+      await view.updateComplete;
+    }
+
+    beforeEach(() => {
+      globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    });
+
+    // Before, the tab switched and nothing was selected, with no word why.
+    it('selects the nearest shown parent and says the filters hide the row', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(log, 'ns.Outer.run()'));
+      expect(note()?.textContent).toContain('Row hidden by current filters');
+      expect(announced()).toContain('filters hide that row');
+      expect(pressed('Debug Only')).toBe('true');
+    });
+
+    it('clears the filters and goes to the row when Clear is pressed', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+      const inner = idOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+
+      await pressClear();
+
+      expect(pressed('Debug Only')).toBe('false');
+      // Details does not hide Inner, so Clear leaves it as chosen.
+      expect(pressed('Details')).toBe('false');
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+      expect(note()).toBeNull();
+    });
+
+    // An issue card can name a detail, such as a debug line. Details only sets how much shows,
+    // so it is turned on, not reported; the bar is for the filters that set what shows.
+    it('turns Details on, with no bar, when Details is what hides the row', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      const hello = idOf(log, 'DEBUG | hello');
+
+      await view._goToRow(hello);
+      await view.updateComplete;
+
+      expect(pressed('Details')).toBe('true');
+      expect(view.timeOrderGrid?.selectedKey).toBe(hello);
+      expect(note()).toBeNull();
+    });
+
+    // Turning Details on cancelled the go-to doing it, so a namespace still hiding the row went unsaid.
+    it('turns Details on and still says so when a namespace hides the row too', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      filterBy.namespaces(view, ['other']);
+
+      await view._goToRow(idOf(log, 'DEBUG | hello'));
+      await view.updateComplete;
+
+      expect(pressed('Details')).toBe('true');
+      expect(note()).not.toBeNull();
+    });
+
+    it('turns Details back off on Clear when only the Type pick turned it on', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      filterBy.type(view, 'USER_DEBUG');
+      const inner = idOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+      expect(pressed('Details')).toBe('true');
+
+      await pressClear();
+
+      expect(pressed('Details')).toBe('false');
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+    });
+
+    // The grid selects nothing when even the top row is filtered out, which was silent.
+    it('says so when the filters hide the row from the top, and Clear reaches it', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      filterBy.namespaces(view, ['other']);
+      filterBy.range(view, 'Total Time', 0);
+      const inner = idOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+      expect(note()).not.toBeNull();
+      // No parent is selected, so saying one is would mislead.
+      expect(announced()).toContain('every row above it');
+
+      await pressClear();
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+      // The controls show the reset, or they would still read as filtering.
+      expect(
+        widget<HTMLElement & { selected: string[] }>(view, 'datagrid-facet-filter').selected,
+      ).toEqual([]);
+      expect(
+        widget<HTMLElement & { range: object }>(view, 'datagrid-range-filter[label="Total Time"]')
+          .range,
+      ).toEqual({ start: null, end: null });
+    });
+
+    it('drops the note when a filter changes', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      filterBy.toggle(view, 'Show Debug Statements Only');
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(announced()).toBe('');
+    });
+
+    // Go to Call Tree from another tab: the tab's first build applied the filters again and cleared it.
+    it('keeps the note when the tab builds its table after the go-to', async () => {
+      const { log } = await storeOf(LOG);
+      let show = () => {};
+      globalThis.IntersectionObserver = class {
+        private readonly callback: IntersectionObserverCallback;
+        constructor(callback: IntersectionObserverCallback) {
+          this.callback = callback;
+        }
+        observe(target: Element): void {
+          show = () =>
+            this.callback(
+              [{ isIntersecting: true, target } as IntersectionObserverEntry],
+              this as unknown as IntersectionObserver,
+            );
+        }
+        disconnect(): void {}
+      } as unknown as typeof IntersectionObserver;
+      view = await mountView(log);
+      filterBy.namespaces(view, ['other']);
+
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
+      show();
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).not.toBeNull();
+    });
+
+    it('drops the note when the log is replaced', async () => {
+      const { log } = await storeOf(LOG);
+      const next = (await storeOf(LOG)).store;
+      await openWithDebugOnly(log);
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      view.logStore = next;
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(announced()).toBe('');
+    });
+
+    // The go-to ended on the old log and wrote its note over the new one.
+    it('leaves no note from a go-to the log replaced while it ran', async () => {
+      const { log } = await storeOf(LOG);
+      const next = (await storeOf(LOG)).store;
+      await openWithDebugOnly(log);
+
+      const going = view._goToRow(idOf(log, 'ns.Inner.go()'));
+      view.logStore = next;
+      await going;
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    // The go-to read the old filters, so its note named a row the new ones may show.
+    it('leaves no note from a go-to a filter change overtook', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+
+      const grid = view.timeOrderGrid!;
+      const goTo = grid.goTo.bind(grid);
+      grid.goTo = (path) => {
+        const going = goTo(path);
+        filterBy.toggle(view, 'Show Debug Statements Only');
+        return going;
+      };
+
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    it('says nothing when the row shows', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(log, 'ns.Inner.go()'));
+      expect(note()).toBeNull();
+    });
+  });
+
+  // A go-to or reveal looked for the new log's row among the old log's rows, and said filters hid it.
+  describe('while a new log loads', () => {
+    const LOG =
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+    const note = () => view.renderRoot.querySelector('.hidden-note');
+    let release: () => void = () => {};
+
+    /** Shows `next` in a view that had another log, with its Time Order rows held back. */
+    async function loading(next: LogStore): Promise<void> {
+      const index = await next.logIndex();
+      const held = new Promise<LogIndex>((resolve) => (release = () => resolve(index)));
+      jest.spyOn(next, 'logIndex').mockReturnValue(held);
+      view.logStore = next;
+      await view.updateComplete;
+    }
+
+    beforeEach(async () => {
+      globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+      view = await mountView();
+    });
+
+    it('goes to the row once the rows load, with no bar', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      const going = view._goToRow(idOf(store.log, 'ns.Outer.run()'));
+      await settle();
+      release();
+      await going;
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(store.log, 'ns.Outer.run()'));
+      expect(note()).toBeNull();
+    });
+
+    it('reveals the row once the rows load, with no bar', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      eventBus.emit('inspector:reveal', {
+        source: 'calltree',
+        eventId: idOf(store.log, 'ns.Outer.run()'),
+      });
+      await settle();
+      release();
+      await settle();
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(store.log, 'ns.Outer.run()'));
+      expect(note()).toBeNull();
+    });
+
+    it('still reveals the row when a filter changes while the rows load', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      eventBus.emit('inspector:reveal', {
+        source: 'calltree',
+        eventId: idOf(store.log, 'ns.Outer.run()'),
+      });
+      await settle();
+      const selected = [...store.log.namespaces];
+      filterBy.namespaces(view, selected);
+      release();
+      await settle();
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(store.log, 'ns.Outer.run()'));
+    });
+
+    it('drops a reveal whose log is replaced again while the rows load', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      eventBus.emit('inspector:reveal', {
+        source: 'calltree',
+        eventId: idOf(store.log, 'ns.Outer.run()'),
+      });
+      await settle();
+      view.logStore = (await storeOf(LOG)).store;
+      release();
+      await settle();
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBeNull();
+      expect(note()).toBeNull();
+    });
   });
 });
 
@@ -571,7 +1193,7 @@ describe('calltree-view type picker', () => {
 
   it("lists the log's types once each, sorted, and no exit lines", async () => {
     view.isVisible = true;
-    view.logStore = storeOf(OUTER).store;
+    view.logStore = (await storeOf(OUTER)).store;
     const types = await typeOptions();
 
     expect(types).toEqual([...new Set(types)].sort());
@@ -586,14 +1208,14 @@ describe('calltree-view type picker', () => {
     view = new CalltreeView();
     document.body.append(view);
     const logIndex = jest.spyOn(LogStore.prototype, 'logIndex');
-    view.logStore = storeOf(OUTER).store;
+    view.logStore = (await storeOf(OUTER)).store;
     await typeOptions();
 
     expect(logIndex).not.toHaveBeenCalled();
   });
 
   it('shows the types of the log it has now, not one it had before', async () => {
-    const before = storeOf(OUTER).log;
+    const before = (await storeOf(OUTER)).log;
     const logIndex = LogStore.prototype.logIndex;
     let release = (): void => {};
     const held = new Promise<void>((resolve) => (release = resolve));
@@ -606,7 +1228,7 @@ describe('calltree-view type picker', () => {
     view.isVisible = true;
     view.logStore = logStoreFor(before);
     await view.updateComplete;
-    view.logStore = storeOf(DML).store;
+    view.logStore = (await storeOf(DML)).store;
     await typeOptions();
     release();
     const types = await typeOptions();

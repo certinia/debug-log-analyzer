@@ -9,7 +9,7 @@ export const CALLTREE_GO_TO_ROW = 'calltree-go-to-row';
 
 /** {@link CALLTREE_GO_TO_ROW} keyed by name, for a listener that wants its payload. */
 export interface CalltreeNavigationEventMap {
-  [CALLTREE_GO_TO_ROW]: CustomEvent<{ eventIndex: number }>;
+  [CALLTREE_GO_TO_ROW]: CustomEvent<{ eventId: number }>;
 }
 
 /**
@@ -17,7 +17,7 @@ export interface CalltreeNavigationEventMap {
  * time-order and scrolls/focuses the row. Lives apart from `CalltreeView` so
  * callers (database grids, detail panel) don't pull in the whole tab module.
  */
-export async function goToRow(target: { eventIndex: number }) {
+export async function goToRow(target: { eventId: number }) {
   document.dispatchEvent(
     new CustomEvent(CALLTREE_GO_TO_ROW, {
       detail: target,
@@ -29,11 +29,11 @@ export async function goToRow(target: { eventIndex: number }) {
  * {@link goToRow} as an issue-card action. Lives here rather than in the notifications
  * feature so the issue cards stay ignorant of the call tree.
  */
-export function goToCallTreeAction(eventIndex: number): IssueAction {
+export function goToCallTreeAction(eventId: number): IssueAction {
   return {
     label: 'Go to call tree',
     run: () => {
-      void goToRow({ eventIndex });
+      void goToRow({ eventId });
     },
   };
 }

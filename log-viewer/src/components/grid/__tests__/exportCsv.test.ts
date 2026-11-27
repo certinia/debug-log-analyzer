@@ -7,7 +7,7 @@
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { exportCsv } from '../exportCsv.js';
 
 const BOM = String.fromCharCode(0xfeff);

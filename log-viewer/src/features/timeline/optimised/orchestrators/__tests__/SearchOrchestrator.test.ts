@@ -27,7 +27,7 @@ async function searched() {
     requestRender: jest.fn(),
   };
   const orchestrator = new SearchOrchestrator(callbacks);
-  const matcher = new EventMatcher(framesOf(LOG).frames);
+  const matcher = new EventMatcher((await framesOf(LOG)).frames);
   await matcher.search(textPredicate('ns.'));
   const internals = orchestrator as unknown as Record<string, unknown>;
   internals['eventMatcher'] = matcher;

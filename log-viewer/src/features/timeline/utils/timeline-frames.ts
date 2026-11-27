@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import { type ApexEvent, eventType } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '../../../core/log/LogIndex.js';
+import { rowCategory, type LogIndex } from '#core/log/LogIndex.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import {
   type EventNode,
@@ -13,9 +13,14 @@ import {
   type TreeNode,
 } from '../types/flamechart.types.js';
 
-export type ApexEventNode = EventNode & { original: LogEvent };
+export type ApexEventNode = EventNode & { original: ApexEvent };
 
 const NO_ROWS: Int32Array = new Int32Array(0);
+
+// A row's state in `shown`: drawn is shown with a category the timeline draws.
+const HIDDEN = 0;
+const SHOWN = 1;
+const DRAWN = 2;
 
 /**
  * The timeline's frames for a log, read from its {@link LogIndex}: a rect for each
@@ -31,19 +36,17 @@ export function buildTimelineFrames(
   categories: Set<string>,
   logEndTime: number,
 ): TimelineFrames<ApexEventNode> {
-  const { rowCount, start, total, depth, parent, subtreeEnd, categoryId } = index;
+  const { rowCount, start, total, depth, parent, subtreeEnd, categoryId, eventId } = index;
+  const columns = index.log.columns;
+  const typeOf = (row: number): string =>
+    eventType(columns.type[eventId[row]!]!)?.type ?? 'UNKNOWN';
+  // The type stands in for the text a limit or profiling block does not state.
+  const labelOf = (row: number): string => columns.text.at(eventId[row]!) ?? typeOf(row);
   const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
   const shown = new Uint8Array(rowCount);
   const rowsAt: number[][] = [];
-  const rects: PrecomputedRect[] = [];
-  const rectAt = new Int32Array(rowCount).fill(NO_ROW);
-  const rectsByCategory = new Map<string, PrecomputedRect[]>();
-  for (const category of categories) {
-    rectsByCategory.set(category, []);
-  }
-  const rectsByDepth = new Map<number, PrecomputedRect[]>();
-  const rectsOfCategory = index.categoryNames.map((name) => rectsByCategory.get(name));
+  const drawnCategory = index.categoryNames.map((name) => categories.has(name));
   let maxDepth = 0;
   let totalDuration = logEndTime;
 
@@ -54,50 +57,22 @@ export function buildTimelineFrames(
       row = subtreeEnd[row]!;
       continue;
     }
-    shown[row] = 1;
+    shown[row] = drawnCategory[categoryId[row]!] ? DRAWN : SHOWN;
     const d = depth[row]!;
     (rowsAt[d] ??= []).push(row);
     if (d > maxDepth) {
       maxDepth = d;
     }
-    const rowStart = start[row]!;
-    const end = rowStart + rowTotal;
+    const end = start[row]! + rowTotal;
     if (end > totalDuration) {
       totalDuration = end;
-    }
-
-    const ofCategory = rectsOfCategory[categoryId[row]!];
-    if (ofCategory) {
-      const event = index.event(row);
-      const rect: PrecomputedRect = {
-        id: String(row),
-        timeStart: rowStart,
-        timeEnd: end,
-        depth: d,
-        duration: rowTotal,
-        selfDuration: index.self[row]!,
-        category: event.category,
-        eventRef: event,
-        x: 0,
-        y: d * eventHeight,
-        width: 0,
-        height: eventHeight,
-      };
-      rectAt[row] = rects.length;
-      rects.push(rect);
-      ofCategory.push(rect);
-      let atDepth = rectsByDepth.get(d);
-      if (!atDepth) {
-        atDepth = [];
-        rectsByDepth.set(d, atDepth);
-      }
-      atDepth.push(rect);
     }
     row++;
   }
 
   // Pre-order is start order unless the log's timestamps go backwards.
   const rowsByDepth = rowsAt.map((rows) => Int32Array.from(sortIfNeeded(rows, start)));
+  const rectRowsByDepth = rowsByDepth.map((rows) => rows.filter((row) => shown[row] === DRAWN));
 
   return {
     rowCount,
@@ -108,40 +83,53 @@ export function buildTimelineFrames(
     depth,
     parent,
     subtreeEnd,
-    rectsByCategory,
-    rectsByDepth,
-    isVisible: (row) => shown[row] === 1,
+    categoryId: index.categoryId,
+    categoryNames: index.categoryNames,
+    rectRowsByDepth,
+    isVisible: (row) => (shown[row] ?? HIDDEN) !== HIDDEN,
     rowsAtDepth: (d) => rowsByDepth[d] ?? NO_ROWS,
-    node: (row): TreeNode<ApexEventNode> => {
-      const event = index.event(row);
-      return {
-        row,
-        depth: depth[row],
-        data: {
-          id: String(row),
-          timestamp: start[row]!,
-          duration: total[row]!,
-          type: typeOf(event),
-          text: event.text,
-          original: event,
-        },
-      };
-    },
-    text: (row) => index.event(row).text,
-    type: (row) => typeOf(index.event(row)),
+    node: (row): TreeNode<ApexEventNode> => ({
+      row,
+      depth: depth[row],
+      data: {
+        id: String(row),
+        timestamp: start[row]!,
+        duration: total[row]!,
+        type: typeOf(row),
+        text: labelOf(row),
+        original: index.event(row),
+      },
+    }),
+    text: labelOf,
+    type: typeOf,
     rowOfOriginal: (original) => {
       if (!original) {
         return NO_ROW;
       }
-      const row = index.rowOfEvent(original as LogEvent);
-      return row !== NO_ROW && shown[row] === 1 ? row : NO_ROW;
+      const row = index.rowOf((original as ApexEvent).id);
+      return row !== NO_ROW && shown[row] !== HIDDEN ? row : NO_ROW;
     },
-    rectOf: (row) => rects[rectAt[row] ?? NO_ROW],
+    hasRect: (row) => shown[row] === DRAWN,
+    // A new object each call, so only what is drawn or returned is ever made.
+    rectOf: (row): PrecomputedRect | undefined => {
+      if (shown[row] !== DRAWN) {
+        return undefined;
+      }
+      const d = depth[row]!;
+      return {
+        row,
+        timeStart: start[row]!,
+        timeEnd: start[row]! + total[row]!,
+        depth: d,
+        duration: total[row]!,
+        category: rowCategory(index, row),
+        x: 0,
+        y: d * eventHeight,
+        width: 0,
+        height: eventHeight,
+      };
+    },
   };
-}
-
-function typeOf(event: LogEvent): string {
-  return event.type ?? event.category ?? 'UNKNOWN';
 }
 
 function sortIfNeeded(rows: number[], start: Float64Array): number[] {
@@ -151,4 +139,27 @@ function sortIfNeeded(rows: number[], start: Float64Array): number[] {
     }
   }
   return rows;
+}
+
+/**
+ * The nearest drawn row at or above event `eventId`, so a detail, a frame with no
+ * duration or an event the log levels hide goes to the frame it sits in. NO_ROW when
+ * no frame above it is drawn.
+ */
+export function drawnRowAtOrAbove(
+  index: LogIndex,
+  frames: TimelineFrames<EventNode>,
+  eventId: number,
+): number {
+  const { parent } = index.log.columns;
+  let id = eventId;
+  let row = index.rowOf(id);
+  while (row === NO_ROW && id > 0) {
+    id = parent[id] ?? 0;
+    row = index.rowOf(id);
+  }
+  while (row !== NO_ROW && !frames.isVisible(row)) {
+    row = index.parent[row]!;
+  }
+  return row;
 }

@@ -11,7 +11,7 @@ keywords:
     apex debug log analysis,
     apex log analyzer guide,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/timeline.png
 hide_title: true
 ---
 

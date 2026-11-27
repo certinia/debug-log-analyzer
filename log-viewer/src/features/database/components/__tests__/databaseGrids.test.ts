@@ -19,8 +19,8 @@ jest.mock('../../../call-tree/navigation.js', () => ({ goToRow: jest.fn() }));
 
 import type { AppGrid } from '../../../../components/grid/AppGrid.js';
 import { parse } from '@apexdevtools/apex-log-parser';
-import { describeLevelGap } from '../../../../core/log/levelCapabilities.js';
-import { setCurrentLog } from '../../../../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { LogStore, setCurrentLog } from '#core/log/LogStore.js';
 import { ContextMenu } from '../../../../components/ContextMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { Group } from '../../../../grid/index.js';
@@ -75,15 +75,16 @@ const GRIDS: Array<[string, Grid]> = [
 ];
 
 /** One stand-in carries what each of the three line types reads. */
-function line(eventIndex: number, rows: number, ns: string, object: string) {
+function line(id: number, rows: number, ns: string, object: string) {
   return {
-    eventIndex,
+    id,
     text: `SELECT Id FROM ${object}`,
     namespace: ns,
-    parent: { namespace: `${ns}-caller` },
-    sObjectType: object,
-    aggregations: 0,
-    children: [{ sObjectType: object, relativeCost: 0.5 }],
+    details: {
+      sObjectType: object,
+      aggregations: 0,
+      explain: { sObjectType: object, relativeCost: 0.5 } as object | null,
+    },
     soqlRowCount: { self: rows },
     dmlRowCount: { self: rows },
     soslRowCount: { self: rows },
@@ -92,6 +93,12 @@ function line(eventIndex: number, rows: number, ns: string, object: string) {
 }
 
 const LINES = [line(1, 5, 'ns1', 'Account'), line(2, 15, 'ns2', 'Contact')];
+
+/** A store where statement `id` is called from frame `id + 10`, in namespace `ns<id>-caller`. */
+const CALLERS = {
+  parentOf: (id: number) => id + 10,
+  log: { columns: { namespace: Object.assign([], { 11: 'ns1-caller', 12: 'ns2-caller' }) } },
+} as unknown as LogStore;
 
 describe.each(GRIDS)('%s', (_name, spec) => {
   let view: View;
@@ -108,7 +115,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
   const kept = (): number[] =>
     rows()
       .filter((row) => grid().filters.every((filter) => filter.test(row)))
-      .map((row) => row.eventIndex);
+      .map((row) => row.eventId);
 
   // Each fires the event the template binds, so the binding is under test with the handler.
   const fire = async (selector: string, event: Event) => {
@@ -121,7 +128,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       new CustomEvent('datagrid-facet-change', { detail: { selected } }),
     );
   const clickButton = (label: string) =>
-    view.renderRoot.querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)?.click();
+    view.renderRoot.querySelector<HTMLElement>(`toolbar-action[label="${label}"]`)?.click();
   const heard = (type: string): unknown[] => {
     const seen: unknown[] = [];
     view.addEventListener(type, (e) => seen.push((e as CustomEvent).detail));
@@ -131,6 +138,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
   beforeEach(async () => {
     view = spec.make() as unknown as View;
     view.lines = LINES;
+    view.logStore = CALLERS;
     document.body.append(view);
     await view.updateComplete;
   });
@@ -154,8 +162,8 @@ describe.each(GRIDS)('%s', (_name, spec) => {
   describe.each(spec.facets.map((facet) => [facet.label, facet] as const))(
     'the %s facet',
     (label, facet) => {
-      const value = (eventIndex: number) =>
-        rows().find((row) => row.eventIndex === eventIndex)?.[facet.field];
+      const value = (eventId: number) =>
+        rows().find((row) => row.eventId === eventId)?.[facet.field];
 
       it('keeps only the picked values, and everything when none is picked', async () => {
         await facetChange(label, [String(value(2))]);
@@ -221,7 +229,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
 
     it('copies through the grid', () => {
       const copy = jest.spyOn(grid(), 'copy').mockResolvedValue(undefined);
-      clickButton('Copy to clipboard');
+      clickButton('Copy to Clipboard');
 
       expect(copy).toHaveBeenCalledTimes(1);
     });
@@ -308,10 +316,14 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('slots the action buttons into the bar', () => {
-      const actions = view.renderRoot.querySelector('div[slot="actions"]');
+      const actions = [...view.renderRoot.querySelectorAll('[slot="actions"]')];
 
-      expect(actions?.parentElement).toBe(bar());
-      expect(actions?.querySelectorAll('vscode-toolbar-button')).toHaveLength(3);
+      expect(actions.map((action) => action.getAttribute('label'))).toEqual([
+        'Columns',
+        'Export to CSV',
+        'Copy to Clipboard',
+      ]);
+      expect(actions.every((action) => action.parentElement === bar())).toBe(true);
     });
   });
 
@@ -328,9 +340,9 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('selects a statement, scrolling only when its row is out of view', async () => {
-      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
-      expect(await view.selectByEventIndex(2)).toBe(true);
+      expect(await view.selectByEventId(2)).toBe(true);
       expect(goTo).toHaveBeenCalledWith([2], { scrollIfVisible: false });
     });
 
@@ -360,8 +372,8 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       fromGrid('lv-grid-select', { row: null, target: null });
 
       expect(seen).toEqual([
-        { type: spec.type, eventIndex: 2 },
-        { type: spec.type, eventIndex: null },
+        { type: spec.type, eventId: 2 },
+        { type: spec.type, eventId: null },
       ]);
     });
 
@@ -377,7 +389,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       fromGrid('lv-grid-locate', { row: rows()[0] });
       fromGrid('lv-grid-locate', { row: null });
 
-      expect(seen).toEqual([{ eventIndexes: [1] }, { eventIndexes: [] }]);
+      expect(seen).toEqual([{ eventIds: [1] }, { eventIds: [] }]);
     });
 
     it('reports a reshape', () => {
@@ -404,7 +416,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     };
 
     it('selects the row it opens on, and shows the menu there', () => {
-      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
       expect(rightClick(rows()[1] as Row).defaultPrevented).toBe(true);
       expect(goTo).toHaveBeenCalledWith([2], { scrollIfVisible: false });
@@ -424,7 +436,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('shows the statement it opened on in the Call Tree', () => {
-      jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
       rightClick(rows()[1] as Row);
       view.renderRoot
         .querySelector('context-menu')
@@ -432,7 +444,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
           new CustomEvent('menu-select', { detail: { itemId: 'show-in-call-tree' } }),
         );
 
-      expect(goToRow).toHaveBeenCalledWith({ eventIndex: 2 });
+      expect(goToRow).toHaveBeenCalledWith({ eventId: 2 });
     });
   });
 });
@@ -440,9 +452,11 @@ describe.each(GRIDS)('%s', (_name, spec) => {
 describe('SOQLView selectivity', () => {
   const captured = (db: string) => parse(`64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,${db}\n`);
 
-  const tooltip = async (): Promise<string | undefined> => {
+  const tooltip = async (explain: object | null = null): Promise<string | undefined> => {
     const view = new SOQLView() as unknown as View;
-    view.lines = [{ ...line(1, 5, 'ns1', 'Account'), children: [] }];
+    const unplanned = line(1, 5, 'ns1', 'Account');
+    unplanned.details.explain = explain;
+    view.lines = [unplanned];
     document.body.append(view);
     await view.updateComplete;
     const grid = view.grid!; // shown: the view has lines
@@ -453,15 +467,24 @@ describe('SOQLView selectivity', () => {
   };
 
   it('names the DB level a log was captured below', async () => {
-    const store = setCurrentLog(captured('FINE'));
+    const store = setCurrentLog(new LogStore(await captured('FINE')));
     const why = describeLevelGap(store.levelGap('queryPlans'));
 
     expect(why).not.toBe('');
     expect(await tooltip()).toBe(`Selectivity could not be determined. ${why}`);
   });
 
+  // A plan with a note, as `relativeCost 0 (with skinny table)`, costs 0: the cheapest, not unknown.
+  it('reads a plan that costs 0 as selective', async () => {
+    setCurrentLog(new LogStore(await captured('FINEST')));
+
+    expect(await tooltip({ sObjectType: 'Account', relativeCost: 0 })).toBe(
+      'Query is selective.\nRelative cost: 0',
+    );
+  });
+
   it('names no level when the levels are not why a query has no plan', async () => {
-    setCurrentLog(captured('FINEST'));
+    setCurrentLog(new LogStore(await captured('FINEST')));
 
     expect(await tooltip()).toBe('Selectivity could not be determined.');
   });

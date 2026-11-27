@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
+import type { EventOf } from '@apexdevtools/apex-log-parser';
 
 /**
  * Derives the queried SObject name for the Database SOQL view. (An earlier
@@ -37,6 +37,6 @@ export function parseFromObject(soql: string | undefined): string | null {
  * (accurate, present only at Database=FINEST); otherwise falls back to a
  * best-effort parse of the query text's `FROM` clause.
  */
-export function deriveSoqlObject(soql: SOQLExecuteBeginLine): string | null {
-  return soql.children[0]?.sObjectType ?? parseFromObject(soql.text);
+export function deriveSoqlObject(soql: EventOf<'SOQL_EXECUTE_BEGIN'>): string | null {
+  return soql.details.explain?.sObjectType ?? parseFromObject(soql.text ?? undefined);
 }

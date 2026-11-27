@@ -7,6 +7,7 @@ import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
 import '../../../components/grid/AppGrid.js';
+import { consume } from '@lit/context';
 import { css, html, LitElement, type PropertyValues, type TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { ref } from 'lit/directives/ref.js';
@@ -28,8 +29,11 @@ import {
   gridGroupControls,
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
-import type { StatementType } from '../../../core/events/EventBus.js';
-import { formatNsAsMs, nsToMs } from '../../../core/utility/Duration.js';
+import type { StatementType } from '#core/events/EventBus.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { DEFAULT_NAMESPACE, getCallerNamespace } from '#core/utility/CallerNamespace.js';
+import { formatNsAsMs, nsToMs } from '#core/utility/Duration.js';
 import {
   Group,
   sum,
@@ -48,9 +52,9 @@ import { goToRow } from '../../call-tree/navigation.js';
 import { soqlGroupCell } from '../../soql/format/groupHeader.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
 
-/** What every statement row carries, whatever its type. Its key is its `eventIndex`. */
+/** What every statement row carries, whatever its type. Its key is its `eventId`. */
 export interface StatementRow {
-  eventIndex: number;
+  eventId: number;
   namespace: string;
   callerNamespace: string;
   rowCount: number;
@@ -80,10 +84,10 @@ interface StatementGridSpec<R> {
 }
 
 /** A row's report of its pick, which `database-view` turns into the tab's selection. */
-export type GridSelectionEvent = CustomEvent<{ type: StatementType; eventIndex: number | null }>;
+export type GridSelectionEvent = CustomEvent<{ type: StatementType; eventId: number | null }>;
 
 /** A row's report of the pointer, which marks the statement without picking it. */
-export type GridLocateEvent = CustomEvent<{ eventIndexes: readonly number[] }>;
+export type GridLocateEvent = CustomEvent<{ eventIds: readonly number[] }>;
 
 const ROW_MENU_ITEMS = new ContextMenuBuilder()
   .addGroup([{ id: 'show-in-call-tree', label: 'Show in Call Tree' }])
@@ -98,6 +102,11 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   /** The log lines to show; supplied by `database-view`. */
   @property({ attribute: false })
   lines: L[] = [];
+
+  /** The log on screen, from the app root; its shown frames name each caller. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   @state()
   private _source: TreeSource<R> | null = null;
@@ -115,8 +124,8 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   protected readonly spec: StatementGridSpec<R>;
   // The grid keeps its work per filter object, so a filter keeps its object until its input changes.
   private readonly _filterSlots = new Map<string, RowFilter<R>>();
-  private _eventIndexes: ReadonlySet<number> = new Set();
-  private _menuEventIndex: number | null = null;
+  private _eventIds: ReadonlySet<number> = new Set();
+  private _menuEventId: number | null = null;
   // State, so the expand button follows the grid once it mounts.
   @state()
   private _grid: AppGrid<R> | null = null;
@@ -148,8 +157,8 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
     });
   }
 
-  /** Maps the log lines to rows, in log order. */
-  protected abstract toRows(lines: readonly L[]): R[];
+  /** Maps the log lines to rows, in log order. `callerOf` names the namespace that called event `id`. */
+  protected abstract toRows(lines: readonly L[], callerOf: (id: number) => string): R[];
 
   /** The grid, once rendered. */
   get grid(): AppGrid<R> | null {
@@ -162,22 +171,22 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   }
 
   /** Whether this grid holds the statement, filtered out or not. */
-  owns(eventIndex: number): boolean {
-    return this._eventIndexes.has(eventIndex);
+  owns(eventId: number): boolean {
+    return this._eventIds.has(eventId);
   }
 
   /** Selects the statement's row, scrolling only when it is out of view. False when no row shows it. */
-  async selectByEventIndex(eventIndex: number): Promise<boolean> {
-    return (await this.grid?.goTo([eventIndex], { scrollIfVisible: false })) ?? false;
+  async selectByEventId(eventId: number): Promise<boolean> {
+    return (await this.grid?.goTo([eventId], { scrollIfVisible: false })) === 'selected';
   }
 
   /**
    * Marks the rows for the statements under the inspector's pointer, or drops the
    * mark with an empty list. Not a pick: nothing scrolls and nothing is selected.
    */
-  markLocated(eventIndexes: readonly number[]): void {
+  markLocated(eventIds: readonly number[]): void {
     // Each grid is offered every mark, and a new set repaints its rows.
-    const owned = eventIndexes.filter((eventIndex) => this._eventIndexes.has(eventIndex));
+    const owned = eventIds.filter((eventId) => this._eventIds.has(eventId));
     if (owned.length !== this._marked.size || owned.some((i) => !this._marked.has(i))) {
       this._marked = new Set(owned);
     }
@@ -205,10 +214,13 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   ];
 
   protected willUpdate(changed: PropertyValues): void {
-    if (changed.has('lines')) {
-      const rows = this.toRows(this.lines);
-      this._eventIndexes = new Set(rows.map((row) => row.eventIndex));
-      this._source = { roots: rows, key: (row) => row.eventIndex };
+    if (changed.has('lines') || changed.has('logStore')) {
+      const store = this.logStore;
+      const rows = this.toRows(this.lines, (id) =>
+        store ? getCallerNamespace(store, id) : DEFAULT_NAMESPACE,
+      );
+      this._eventIds = new Set(rows.map((row) => row.eventId));
+      this._source = { roots: rows, key: (row) => row.eventId };
       this._columns = this.spec.columns(rows);
       this._settings.applyTo(this._columnTarget);
       this._facetValues = this.spec.facets.map((facet) =>
@@ -337,14 +349,14 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
     }
     this._emit<GridSelectionEvent['detail']>('grid-selection', {
       type: this.spec.type,
-      eventIndex: e.detail.row?.eventIndex ?? null,
+      eventId: e.detail.row?.eventId ?? null,
     });
   };
 
   private readonly _onLocate = (e: CustomEvent<GridRowDetail<R>>): void => {
     const { row } = e.detail;
     this._emit<GridLocateEvent['detail']>('grid-locate', {
-      eventIndexes: row ? [row.eventIndex] : [],
+      eventIds: row ? [row.eventId] : [],
     });
   };
 
@@ -355,8 +367,8 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
       return;
     }
     event.preventDefault();
-    void this.selectByEventIndex(row.eventIndex);
-    this._menuEventIndex = row.eventIndex;
+    void this.selectByEventId(row.eventId);
+    this._menuEventId = row.eventId;
     menu.show(ROW_MENU_ITEMS, event.clientX, event.clientY);
   };
 
@@ -367,8 +379,8 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   private readonly _onMenuSelect = (e: CustomEvent<{ itemId: string }>): void => {
     const { itemId } = e.detail;
     if (itemId === 'show-in-call-tree') {
-      if (this._menuEventIndex !== null) {
-        void goToRow({ eventIndex: this._menuEventIndex });
+      if (this._menuEventId !== null) {
+        void goToRow({ eventId: this._menuEventId });
       }
       return;
     }

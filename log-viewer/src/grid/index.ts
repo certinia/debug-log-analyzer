@@ -34,4 +34,5 @@ export {
   type GridRowDetail,
   type GridSelectDetail,
   type GridSort,
+  type GoToResult,
 } from './ui/index.js';

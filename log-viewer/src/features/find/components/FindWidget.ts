@@ -4,12 +4,13 @@ import type { VscodeTextfield } from '#vscode-elements/vscode-textfield.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { DelayController } from '../../../core/events/DelayController.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import { DelayController } from '#core/events/DelayController.js';
+import { DomListenerController } from '#core/events/DomListenerController.js';
 import type { FindDirection, FindEventMap, FindResultsEventDetail } from '../findEvents.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
+import { liveStatus } from '../../../components/liveStatus.js';
 
 // web components
 import '../../../components/VsIconCheckbox.js';
@@ -159,7 +160,7 @@ export class FindWidget extends LitElement {
       </vscode-textfield>
       <div class="matches-count">
         <span aria-hidden="true">${this._getMatchesText()}</span>
-        <span class="sr-only" role="status">${this._getMatchesSpoken()}</span>
+        ${liveStatus(this._getMatchesSpoken())}
       </div>
 
       <div class="find-actions">

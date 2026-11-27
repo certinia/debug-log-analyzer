@@ -136,6 +136,10 @@ const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
  * (whether a row can still open or close changed) and `lv-grid-error`.
  * When a build throws, the grid shows an alert in place of its rows until a build succeeds.
  */
+
+/** How a {@link LvGrid.goTo} ended. */
+export type GoToResult = 'selected' | 'none-shown' | 'superseded';
+
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
   static styles: CSSResultGroup = gridStyles;
@@ -200,9 +204,13 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ type: Boolean, attribute: 'fit-rows', reflect: true })
   fitRows = false;
 
-  /** What the body shows when no row passes the filters and no build runs, such as "No SOQL queries found". */
+  /** What the body shows when the source has no rows and no build runs, such as "No SOQL queries found". */
   @property({ attribute: false })
   placeholder: string | null = null;
+
+  /** What the body shows in place of `placeholder` when the source has rows but the filters hide them all. */
+  @property({ attribute: false })
+  filteredPlaceholder: string | null = 'No results match your filters';
 
   /** The alert shown in place of the rows while a build fails. */
   @property({ attribute: false })
@@ -298,36 +306,47 @@ export class LvGrid<R extends object = object> extends LitElement {
     await this.store?.refresh();
   }
 
+  /** The selected data row's key; null for a group row or no selection. */
+  get selectedKey(): RowKey | null {
+    const target = this.selected;
+    return target === null || target instanceof Group ? null : target;
+  }
+
   /**
-   * Opens each ancestor on `path` (keys from the root down), then scrolls the row to the
-   * middle and selects it. False when no row on the path is shown, or when a selection made
-   * while the path opens, by a newer `goTo`, {@link deselect}, a click or a key, wins. Finds
-   * rows of a `source` set earlier in the same turn. With `scrollIfVisible` false, a row
-   * already in view whole stays where it is.
+   * Opens each ancestor on `path` (keys from the root down), then scrolls the deepest shown
+   * row on it to the middle and selects it: `'selected'`. `'none-shown'` when no row on the
+   * path is shown. `'superseded'` when a selection made while the path opens, by a newer
+   * `goTo`, {@link deselect}, a click or a key, wins. Finds rows of a `source` set earlier in
+   * the same turn. With `scrollIfVisible` false, a row already in view whole stays where it is.
    */
   async goTo(
     path: readonly RowKey[],
     { scrollIfVisible = true }: { scrollIfVisible?: boolean } = {},
-  ): Promise<boolean> {
+  ): Promise<GoToResult> {
     const selection = ++this.selections;
     // A source set in the same turn reaches the store only in this element's update.
     await this.updateComplete;
     const index = (await this.store?.reveal(path)) ?? -1;
-    if (index < 0) {
-      return false;
-    }
     await this.updateComplete;
     if (selection !== this.selections) {
-      return false;
+      return 'superseded';
+    }
+    if (index < 0) {
+      return 'none-shown';
     }
     this.bringIntoView(index, scrollIfVisible);
     this.select(this.targetAt(index), index);
-    return true;
+    return 'selected';
   }
 
   /** Moves keyboard focus to the grid, so its keys and copy work. */
   override focus(options?: FocusOptions): void {
     this.scrollerRef.value?.focus(options);
+  }
+
+  /** The header row's height in px, read from layout on each call; 0 before the first render. */
+  get headerHeight(): number {
+    return this.renderRoot.querySelector<HTMLElement>('.head')?.offsetHeight ?? 0;
   }
 
   /**
@@ -636,10 +655,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (snapshot?.failed) {
       return { role: 'alert', text: this.errorText };
     }
-    if (!snapshot?.rows.size && !snapshot?.busy && this.placeholder !== null) {
-      return { role: 'status', text: this.placeholder };
+    if (snapshot?.rows.size || snapshot?.busy) {
+      return null;
     }
-    return null;
+    const text = this.source?.roots.length ? this.filteredPlaceholder : this.placeholder;
+    return text === null ? null : { role: 'status', text };
   }
 
   private headerCell(column: GridColumn<R>, index: number): TemplateResult {

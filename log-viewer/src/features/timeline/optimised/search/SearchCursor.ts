@@ -10,13 +10,31 @@
  */
 
 import type { EventNode } from '../../types/flamechart.types.js';
-import type { MatchedEventInfo, SearchCursor, SearchMatch } from '../../types/search.types.js';
+import type { RowSet, SearchCursor, SearchMatch } from '../../types/search.types.js';
+
+// A byte per row up to the last match: a search can match every frame of a log.
+class RowBitmap implements RowSet {
+  readonly size: number;
+  private readonly bits: Uint8Array;
+
+  /** `matches` are unique and ascending by row, as `EventMatcher.scan` gives them. */
+  constructor(matches: ReadonlyArray<{ row: number }>) {
+    this.bits = new Uint8Array((matches.at(-1)?.row ?? -1) + 1);
+    for (const { row } of matches) {
+      this.bits[row] = 1;
+    }
+    this.size = matches.length;
+  }
+
+  has(row: number): boolean {
+    return this.bits[row] === 1;
+  }
+}
 
 export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   private _currentIndex: number;
   private readonly _matches: SearchMatch<E>[];
-  private _matchedEventIds: ReadonlySet<string> | null = null;
-  private _matchedEventsInfo: ReadonlyArray<MatchedEventInfo> | null = null;
+  private _matchedRows: RowSet | null = null;
 
   constructor(matches: SearchMatch<E>[]) {
     this._matches = matches;
@@ -55,21 +73,8 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
     return null;
   }
 
-  getMatchedEventIds(): ReadonlySet<string> {
-    return (this._matchedEventIds ??= new Set(this._matches.map((m) => m.rect.id)));
-  }
-
-  /**
-   * Both memos hold for the life of the cursor, which needs `_matches` to be the caller's
-   * last word on the match set. `buildMatchIndex` also keys its cache on this array, so it
-   * must stay the same one.
-   */
-  getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo> {
-    return (this._matchedEventsInfo ??= this._matches.map((m) => ({
-      timestamp: m.rect.timeStart,
-      duration: m.rect.duration,
-      depth: m.depth,
-      category: m.rect.category,
-    })));
+  /** Memoised: `_matches` never changes after construction. */
+  getMatchedRows(): RowSet {
+    return (this._matchedRows ??= new RowBitmap(this._matches));
   }
 }

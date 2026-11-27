@@ -3,8 +3,7 @@
  */
 import type { Token } from './tokenize.js';
 
-/** Keywords that open a clause. `GROUP` and `ORDER` take the following `BY`. */
-export const CLAUSE_KEYWORDS = new Set<string>([
+const CLAUSE_KEYWORDS = new Set<string>([
   'SELECT',
   'FROM',
   'WHERE',
@@ -15,11 +14,35 @@ export const CLAUSE_KEYWORDS = new Set<string>([
   'LIMIT',
   'OFFSET',
   'FOR',
+  'UPDATE',
+  'SET',
   'FIND',
   'RETURNING',
   'USING',
   'TYPEOF',
 ]);
+
+// These open a clause only before one of their followers, which joins the head; `FOR UPDATE` stays whole.
+const CLAUSE_FOLLOWERS: Record<string, string[]> = {
+  GROUP: ['BY'],
+  ORDER: ['BY'],
+  SET: ['OPTIONS'],
+  UPDATE: ['TRACKING', 'VIEWSTAT'],
+};
+
+/** True when `t` is the keyword or function `name`, given in upper case. */
+export function isKeyword(t: Token | undefined, name: string): boolean {
+  return !!t && (t.kind === 'keyword' || t.kind === 'function') && t.text.toUpperCase() === name;
+}
+
+/** True when `token`, upper-cased as `upper`, opens a clause before `next`. */
+export function opensClause(token: Token, upper: string, next: Token | undefined): boolean {
+  if ((token.kind !== 'keyword' && token.kind !== 'function') || !CLAUSE_KEYWORDS.has(upper)) {
+    return false;
+  }
+  const followers = CLAUSE_FOLLOWERS[upper];
+  return !followers || followers.some((word) => isKeyword(next, word));
+}
 
 /** Keywords that join two conditions. */
 export const COND_JOIN = new Set<string>(['AND', 'OR']);
@@ -29,7 +52,7 @@ export const INDENT = '  ';
 
 /** One clause of a query: its keyword tokens, and every token up to the next clause. */
 export interface Clause {
-  /** Upper-case name, `GROUP BY` and `ORDER BY` included. Empty for text before any clause. */
+  /** Upper-case name, a follower such as the `BY` of `GROUP BY` included. Empty for text before any clause. */
   keyword: string;
   head: Token[];
   body: Token[];
@@ -71,18 +94,13 @@ export function splitClauses(tokens: Token[]): Clause[] {
     }
 
     const upper = token.text.toUpperCase();
-    const opensClause =
-      depth === 0 &&
-      (token.kind === 'keyword' || token.kind === 'function') &&
-      CLAUSE_KEYWORDS.has(upper);
-
-    if (opensClause) {
+    const next = nonWs[i + 1];
+    if (depth === 0 && opensClause(token, upper, next)) {
       const head = [token];
       let keyword = upper;
-      const next = nonWs[i + 1];
-      if ((upper === 'GROUP' || upper === 'ORDER') && next?.text.toUpperCase() === 'BY') {
+      if (next && CLAUSE_FOLLOWERS[upper]) {
         head.push(next);
-        keyword = `${upper} BY`;
+        keyword = `${upper} ${next.text.toUpperCase()}`;
         i++;
       }
       current = { keyword, head, body: [] };

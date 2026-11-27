@@ -3,10 +3,12 @@
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
+import { idOf } from '#test-helpers/apexLog.js';
 import { framesOf } from '#test-helpers/timeline.js';
 import type { EventNode } from '../../../types/flamechart.types.js';
 import { buildTimelineFrames } from '../../../utils/timeline-frames.js';
 import { EventMatcher, textPredicate } from '../EventMatcher.js';
+import { buildMatchIndex } from '../SearchBucketMatcher.js';
 
 const LOG =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -17,7 +19,7 @@ const LOG =
   '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
 describe('textPredicate', () => {
-  it('matches on text or type, ignoring case by default', () => {
+  it('matches on text or type, ignoring case by default', async () => {
     const matches = textPredicate('INNER');
 
     expect(matches('ns.Inner.First()', 'METHOD_ENTRY')).toBe(true);
@@ -25,7 +27,7 @@ describe('textPredicate', () => {
     expect(textPredicate('method')('anything', 'METHOD_ENTRY')).toBe(true);
   });
 
-  it('keeps case when asked', () => {
+  it('keeps case when asked', async () => {
     const matches = textPredicate('First', true);
 
     expect(matches('ns.Inner.First()', 'METHOD_ENTRY')).toBe(true);
@@ -36,7 +38,7 @@ describe('textPredicate', () => {
 
 describe('EventMatcher', () => {
   it('finds the shown frames that match, in log order', async () => {
-    const { frames } = framesOf(LOG);
+    const { frames } = await framesOf(LOG);
     const cursor = await new EventMatcher(frames).search(textPredicate('ns.'));
 
     expect(cursor?.matches.map((match) => match.event.text)).toEqual([
@@ -45,8 +47,22 @@ describe('EventMatcher', () => {
     ]);
   });
 
+  // The renderers keep a frame in colour by its row; the last match must be in the set too.
+  it('gives the rows it matched, and no other', async () => {
+    const { log, index, frames } = await framesOf(LOG);
+    const rowOf = (text: string) => index.rowOf(idOf(log, text));
+    const cursor = (await new EventMatcher(frames).search(textPredicate('ns.')))!;
+    const rows = cursor.getMatchedRows();
+
+    expect(rows.size).toBe(2);
+    expect(rows.has(rowOf('ns.Outer.run()'))).toBe(true);
+    expect(rows.has(rowOf('ns.Inner.First()'))).toBe(true);
+    expect(rows.has(rowOf('SELECT Id FROM Account'))).toBe(false);
+    expect(rows.has(0)).toBe(false);
+  });
+
   it('makes no match current until a seek, and none again for -1', async () => {
-    const { frames } = framesOf(LOG);
+    const { frames } = await framesOf(LOG);
     const cursor = await new EventMatcher(frames).search(textPredicate('ns.'));
     expect(cursor?.currentIndex).toBe(-1);
     expect(cursor?.getCurrent()).toBeNull();
@@ -57,7 +73,7 @@ describe('EventMatcher', () => {
   });
 
   it('skips a frame with no duration', async () => {
-    const { frames } = framesOf(
+    const { frames } = await framesOf(
       LOG +
         '09:18:22.6 (1900)|METHOD_ENTRY|[6]|01p|ns.Instant.run()\n' +
         '09:18:22.6 (1900)|METHOD_EXIT|[6]|ns.Instant.run()\n',
@@ -71,7 +87,7 @@ describe('EventMatcher', () => {
   });
 
   it('skips a frame with no rect', async () => {
-    const { index } = framesOf(LOG);
+    const { index } = await framesOf(LOG);
     const apexOnly = buildTimelineFrames(index, new Set(['Apex']), 0);
 
     expect((await new EventMatcher(apexOnly).search(textPredicate('select')))?.total).toBe(0);
@@ -95,7 +111,7 @@ describe('EventMatcher', () => {
       ['a newer search', (matcher: EventMatcher<EventNode>) => void matcher.search(() => false)],
       ['a clear', (matcher: EventMatcher<EventNode>) => matcher.clear()],
     ])('is stopped by %s while it scans, and gives null', async (_name, stop) => {
-      const matcher = new EventMatcher(framesOf(LOG + many).frames);
+      const matcher = new EventMatcher((await framesOf(LOG + many)).frames);
       // A clock that runs out at the first deadline check, so the scan yields and sees the stop.
       jest.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(100);
       const matches = textPredicate('ns.');
@@ -112,7 +128,7 @@ describe('EventMatcher', () => {
     });
 
     it('finds every match once it finishes', async () => {
-      const matcher = new EventMatcher(framesOf(LOG + many).frames);
+      const matcher = new EventMatcher((await framesOf(LOG + many)).frames);
       // A clock that runs out at the first deadline check, so the scan yields once.
       jest.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(100);
 
@@ -121,22 +137,33 @@ describe('EventMatcher', () => {
     });
   });
 
+  // Under the execution and code unit, Outer is depth 2, Inner 3, so its SOQL is 4.
+  it("gives a match its frame's place and category", async () => {
+    const { frames } = await framesOf(LOG);
+    const cursor = (await new EventMatcher(frames).search(textPredicate('SELECT')))!;
+
+    expect(cursor.matches).toHaveLength(1);
+    expect(cursor.matches[0]).toMatchObject({
+      timeStart: 1300,
+      duration: 100,
+      depth: 4,
+      category: 'SOQL',
+    });
+  });
+
   it('builds a match event only when it is read', async () => {
-    const { frames } = framesOf(LOG);
+    const { frames } = await framesOf(LOG);
     const node = jest.spyOn(frames, 'node');
     // Nothing stops this search, so it gives a cursor.
     const cursor = (await new EventMatcher(frames).search(textPredicate('ns.')))!;
-    const ids = cursor.getMatchedEventIds();
-    const info = cursor.getMatchedEventsInfo();
+    const rows = cursor.getMatchedRows();
+    const index = buildMatchIndex(cursor.matches);
 
     expect(node).not.toHaveBeenCalled();
 
     const first = cursor.matches[0]!;
-    expect(ids.has(first.event.id)).toBe(true);
-    expect(info[0]).toMatchObject({
-      timestamp: first.event.timestamp,
-      duration: first.event.duration,
-    });
+    expect(rows.has(first.row)).toBe(true);
+    expect(index.get(first.depth)?.starts[0]).toBe(first.event.timestamp);
     expect(first.event).toBe(first.event);
     expect(node).toHaveBeenCalledTimes(1);
   });

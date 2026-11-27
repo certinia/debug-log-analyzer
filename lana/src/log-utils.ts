@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 
 /** Regex to extract nanosecond timestamp from log line. Format: "HH:MM:SS.d (nanoseconds)|EVENT_TYPE" */
 export const TIMESTAMP_REGEX = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|/;
@@ -23,8 +23,8 @@ export function formatDuration(nanoseconds: number): string {
   }
 }
 
-/** Build metric parts for hover/decoration display from a LogEvent */
-export function buildMetricParts(event: LogEvent): string[] {
+/** Build metric parts for hover/decoration display from an event */
+export function buildMetricParts(event: ApexEvent): string[] {
   const parts: string[] = [];
 
   // Duration with optional self time
@@ -36,29 +36,29 @@ export function buildMetricParts(event: LogEvent): string[] {
   }
 
   // SOQL with self count
-  if (event.soqlCount.total > 0) {
+  if (event.soqlCount?.total) {
     const selfPart = event.soqlCount.self > 0 ? ` (self: ${event.soqlCount.self})` : '';
     parts.push(`${event.soqlCount.total} SOQL${selfPart}`);
   }
 
   // SOQL rows
-  if (event.soqlRowCount.total > 0) {
+  if (event.soqlRowCount?.total) {
     parts.push(`${event.soqlRowCount.total} rows`);
   }
 
   // DML with self count
-  if (event.dmlCount.total > 0) {
+  if (event.dmlCount?.total) {
     const selfPart = event.dmlCount.self > 0 ? ` (self: ${event.dmlCount.self})` : '';
     parts.push(`${event.dmlCount.total} DML${selfPart}`);
   }
 
   // DML rows
-  if (event.dmlRowCount.total > 0) {
+  if (event.dmlRowCount?.total) {
     parts.push(`${event.dmlRowCount.total} DML rows`);
   }
 
   // Exceptions
-  if (event.thrownCount.total > 0) {
+  if (event.thrownCount?.total) {
     parts.push(`\u26a0\ufe0f ${event.thrownCount.total} thrown`);
   }
 

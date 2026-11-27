@@ -29,8 +29,8 @@ const GAINS: Gain[] = [
   {
     task: 'Large log ready',
     version: '1.24',
-    before: 1964,
-    after: 637,
+    before: 965,
+    after: 78,
     unit: 'ms',
     gain: 'faster',
     measuredOn: '100 MB log',
@@ -38,8 +38,8 @@ const GAINS: Gain[] = [
   {
     task: 'Memory after opening a large log',
     version: '1.24',
-    before: 503,
-    after: 268,
+    before: 488,
+    after: 47,
     unit: 'MB',
     gain: 'less',
     measuredOn: '100 MB log',

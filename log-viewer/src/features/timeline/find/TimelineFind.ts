@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { firstIndexWhere } from '../../../core/utility/Util.js';
+import { firstIndexWhere } from '#core/utility/Util.js';
 import type { FindCount, FindQuery, FindTarget } from '../../find/FindController.js';
 import type { FindDirection } from '../../find/findEvents.js';
 import type { FlameChart } from '../optimised/FlameChart.js';
@@ -71,7 +71,7 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     }
     // By start, which log order sorts by, not overlap: a parent that spans the view, such as the root, would pull every step back to it.
     const firstFrom = (time: number): number =>
-      firstIndexWhere(matches.length, (i) => (matches[i]?.rect.timeStart ?? Infinity) >= time);
+      firstIndexWhere(matches.length, (i) => (matches[i]?.timeStart ?? Infinity) >= time);
     if (direction === 'next') {
       const match = firstFrom(bounds.timeStart);
       return match < matches.length ? match : -1;

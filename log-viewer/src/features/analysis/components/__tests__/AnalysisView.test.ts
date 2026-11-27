@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
@@ -21,16 +21,12 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { governorLimits } from '#test-helpers/limits.js';
+import { frameLines, idOf, rawStoreOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
-import {
-  eventBus,
-  type DetailSelection,
-  type DetailSource,
-} from '../../../../core/events/EventBus.js';
+import { eventBus, type DetailSelection, type DetailSource } from '#core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
-import { logStoreFor } from '../../../../core/log/LogStore.js';
-import { BOTTOM_UP_DETAILS } from '../../../call-tree/grid/columns.js';
+import { logStoreFor } from '#core/log/LogStore.js';
+import { BOTTOM_UP_WITHOUT_DETAILS } from '../../../call-tree/grid/columns.js';
 import { MergedTree } from '../../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
@@ -38,63 +34,29 @@ import { AnalysisView } from '../AnalysisView.js';
 /** Pushes settings to the view, as the extension does on a change. */
 let applySettings: (settings: object) => void = () => {};
 
-/** The log's own index, which a reveal resolves its frame through, and which the
- *  fixture's event indexes count off. */
-let byEventIndex: LogEvent[] = [];
-
-function frame(
-  text: string,
-  self: number,
-  total: number,
-  parent: LogEvent | null,
-  type = 'METHOD_ENTRY',
-): LogEvent {
-  const event = {
-    eventIndex: byEventIndex.length,
-    type,
-    namespace: 'default',
-    text,
-    parent,
-    children: [],
-    duration: { self, total },
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-    heapAllocated: { self: 0, total: 0 },
-    heapGross: { self: 0, total: 0 },
-    heapPeak: 0,
-  } as unknown as LogEvent;
-  parent?.children.push(event);
-  byEventIndex.push(event);
-  return event;
-}
-
 /**
- * A -> B -> A on one branch, A -> C -> A on the other, and a debug line with no
- * time, under a log root as the parser leaves it: a bottom-up chain runs out to
- * the root and stops there.
+ * A -> B -> A on one branch, A -> C -> A on the other, then a debug line with no
+ * time: a bottom-up chain runs out to the top of the log and stops there.
  */
-function recursiveLog(): ApexLog {
-  const root = frame('LOG_ROOT', 0, 150, null);
-  const outer1 = frame('A', 10, 100, root);
-  const b1 = frame('B', 20, 90, outer1);
-  frame('A', 70, 70, b1);
-  const outer2 = frame('A', 5, 50, root);
-  const c1 = frame('C', 15, 45, outer2);
-  frame('A', 30, 30, c1);
-  frame('debug', 0, 0, root, 'USER_DEBUG');
-  return Object.assign(root, {
-    eventsById: byEventIndex,
-    namespaces: [],
-    governorLimits: governorLimits(),
-  }) as unknown as ApexLog;
+async function recursiveLog(): Promise<ApexLog> {
+  const { log } = await rawStoreOf(
+    frameLines([
+      {
+        text: 'A',
+        self: 10,
+        children: [{ text: 'B', self: 20, children: [{ text: 'A', self: 70 }] }],
+      },
+      {
+        text: 'A',
+        self: 5,
+        children: [{ text: 'C', self: 15, children: [{ text: 'A', self: 30 }] }],
+      },
+    ]) + '09:18:22.6 (1150)|USER_DEBUG|[1]|DEBUG|debug\n',
+  );
+  return log;
 }
 
-/** The index of the debug line `recursiveLog` ends with. */
+/** The id of the debug line `recursiveLog` ends with. */
 const DEBUG_LINE = 7;
 
 function findRow(rows: readonly BottomUpRow[], text: string): BottomUpRow {
@@ -125,8 +87,7 @@ describe('analysis-view', () => {
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    byEventIndex = [];
-    log = recursiveLog();
+    log = await recursiveLog();
     view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
@@ -145,18 +106,25 @@ describe('analysis-view', () => {
     jest.restoreAllMocks();
   });
 
-  it('shows the bottom-up tree of the log, ranked by self time, without rows that have no details', () => {
+  // A copy of its own would hold every row a second time beside the Call Tree's Bottom-Up.
+  it('shows the Bottom-Up rows every view of the log shares', async () => {
+    const shared = await MergedTree.bottomUp(logStoreFor(log));
+
+    expect(roots()).toBe(shared?.source.roots);
+  });
+
+  it('shows the bottom-up tree of the log, ranked by self time, frames only', () => {
     expect(roots().map((row) => [row.text, row.totalSelfTime])).toEqual(
       expect.arrayContaining([
         ['A', 115],
         ['B', 20],
         ['C', 15],
-        ['debug', 0],
+        ['DEBUG | debug', 0],
       ]),
     );
     expect(roots()).toHaveLength(4);
     expect(grid().sort).toEqual({ column: 'totalSelfTime', dir: 'desc' });
-    const debug = findRow(roots(), 'debug');
+    const debug = findRow(roots(), 'DEBUG | debug');
     expect(grid().filters.every((filter) => filter.test(debug))).toBe(false);
   });
 
@@ -180,8 +148,8 @@ describe('analysis-view', () => {
         view: 'callers',
         selection: {
           kind: 'aggregate',
-          instances: rootRow.instances.map((event) => event.eventIndex),
-          frames: rootRow.instances.map((event) => event.eventIndex),
+          eventIds: [...rootRow.eventIds],
+          frameIds: [...rootRow.eventIds],
           // The root row names the calls it counts, so nothing made them but it.
           calledBy: undefined,
         },
@@ -197,22 +165,23 @@ describe('analysis-view', () => {
     select(throughB);
     select(throughBA);
 
-    const derived = rootRow.instances.filter((event) => event.parent?.text === 'B');
+    const { parent, text } = log.columns;
+    const derived = rootRow.eventIds.filter((id) => text.at(parent[id]!) === 'B');
     expect(derived).toHaveLength(1);
     expect(seen.map((detail) => detail.selection)).toEqual([
       // Both rows hold the same one call, so the row is what tells them apart:
-      // reached through B, then through the A above B. `frames` is the caller
+      // reached through B, then through the A above B. `frameIds` is the caller
       // each row is, a level up from the call its totals count.
       {
         kind: 'aggregate',
-        instances: derived.map((event) => event.eventIndex),
-        frames: [2],
+        eventIds: derived,
+        frameIds: [2],
         calledBy: 'B',
       },
       {
         kind: 'aggregate',
-        instances: derived.map((event) => event.eventIndex),
-        frames: [1],
+        eventIds: derived,
+        frameIds: [1],
         calledBy: 'A',
       },
     ]);
@@ -226,9 +195,7 @@ describe('analysis-view', () => {
 
   it('tells the inspector which calls the pointer is over', () => {
     const located: number[][] = [];
-    const stop = eventBus.on('detail:locate', ({ eventIndexes }) =>
-      located.push([...eventIndexes]),
-    );
+    const stop = eventBus.on('detail:locate', ({ eventIds }) => located.push([...eventIds]));
 
     fireOnGrid('lv-grid-locate', { row: findRow(roots(), 'B') });
     fireOnGrid('lv-grid-locate', { row: null });
@@ -240,56 +207,240 @@ describe('analysis-view', () => {
   it('reveals the bucket a frame heads, without echoing the select', async () => {
     const goTo = jest.spyOn(grid(), 'goTo').mockImplementation(async () => {
       select(findRow(roots(), 'B'));
-      return true;
+      return 'selected';
     });
 
     // Frame 2 is the log's own `B` call, which the `B` bucket heads.
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 2 });
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: 2 });
     await settle();
 
     expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'B').id], { scrollIfVisible: false });
     expect(seen).toEqual([]);
+    // The bucket is a frame, so Details stays off.
+    expect(grid().filters).toContain(BOTTOM_UP_WITHOUT_DETAILS);
   });
 
   it('turns Details on to reveal a bucket the filter hides', async () => {
-    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: DEBUG_LINE });
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: DEBUG_LINE });
     await settle();
 
     expect(grid().filters).toEqual([]);
-    expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'debug').id], { scrollIfVisible: false });
+    expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'DEBUG | debug').id], {
+      scrollIfVisible: false,
+    });
+  });
+
+  // The reveal looked for the new log's row in the old log's tree, so it selected nothing.
+  it('reveals a row of a new log once its tree is built, with no bar', async () => {
+    const { log: next } = await rawStoreOf(
+      frameLines([{ text: 'X', self: 10, children: [{ text: 'Y', self: 20 }] }]),
+    );
+    const build = MergedTree.bottomUp;
+    let release: () => void = () => {};
+    jest.spyOn(MergedTree, 'bottomUp').mockImplementation(async (store, options) => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return build(store, options);
+    });
+    view.logStore = logStoreFor(next);
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: idOf(next, 'Y') });
+    await settle();
+    release();
+    await settle();
+    await view.updateComplete;
+
+    expect(grid().selectedKey).toBe(findRow(roots(), 'Y').id);
+    expect(view.renderRoot.querySelector('.hidden-note')).toBeNull();
+  });
+
+  describe('hidden-row bar', () => {
+    const note = () => view.renderRoot.querySelector('.hidden-note');
+    const gridFocused = () => (view.renderRoot as ShadowRoot).activeElement === grid();
+    const pickNamespaces = async (selected: string[]) => {
+      view.renderRoot
+        .querySelector('datagrid-facet-filter[label="Namespace"]')
+        ?.dispatchEvent(
+          new CustomEvent('datagrid-facet-change', { detail: { selected }, bubbles: true }),
+        );
+      await view.updateComplete;
+    };
+    const reveal = async (eventId: number) => {
+      eventBus.emit('inspector:reveal', { source: 'analysis', eventId });
+      await settle();
+      await view.updateComplete;
+    };
+
+    // #1211: a finding in a filtered-out namespace selected nothing, with no word why.
+    it('says so when a reveal names a bucket the filters hide, and Clear reaches it', async () => {
+      await pickNamespaces(['other']);
+      view.renderRoot.querySelector('datagrid-range-filter[label="Total Time"]')?.dispatchEvent(
+        new CustomEvent('datagrid-range-change', {
+          detail: { range: { start: 0, end: null } },
+          bubbles: true,
+        }),
+      );
+      await view.updateComplete;
+
+      await reveal(2);
+      expect(note()?.textContent).toContain('Row hidden by current filters');
+      expect(grid().selectedKey).toBeNull();
+
+      note()
+        ?.querySelector<HTMLElement>('[aria-label="Clear filters and go to the hidden row"]')
+        ?.click();
+      await settle();
+      await view.updateComplete;
+
+      expect(grid().selectedKey).toBe(findRow(roots(), 'B').id);
+      expect(note()).toBeNull();
+      // The button went with the bar; focus left on the body strands a keyboard user.
+      expect(gridFocused()).toBe(true);
+      expect(grid().filters.filter((filter) => filter !== BOTTOM_UP_WITHOUT_DETAILS)).toEqual([]);
+      const total = [...view.renderRoot.querySelectorAll('datagrid-range-filter')].find(
+        (el) => el.label === 'Total Time',
+      );
+      expect(view.renderRoot.querySelector('datagrid-facet-filter')?.selected).toEqual([]);
+      expect(total?.range).toEqual({ start: null, end: null });
+    });
+
+    it.each([
+      ['the close button', () => note()?.querySelector<HTMLElement>('[label="Close"]')?.click()],
+      [
+        'Escape',
+        () => note()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+      ],
+    ])('goes on %s, keeping the filters as chosen', async (_how, close) => {
+      await pickNamespaces(['other']);
+      const filters = grid().filters;
+      await reveal(2);
+
+      close();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(grid().filters).toEqual(filters);
+      expect(gridFocused()).toBe(true);
+    });
+
+    // The bar named a row the new filters may show.
+    it('goes when a filter changes', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      await pickNamespaces(['another']);
+
+      expect(note()).toBeNull();
+    });
+
+    it('stays away when a filter change overtakes the reveal', async () => {
+      await pickNamespaces(['other']);
+      const goTo = grid().goTo.bind(grid());
+      jest.spyOn(grid(), 'goTo').mockImplementation(async (path, options) => {
+        const going = goTo(path, options);
+        await pickNamespaces(['another']);
+        return going;
+      });
+
+      await reveal(2);
+
+      expect(note()).toBeNull();
+    });
+
+    // The Details change the reveal makes invalidated the reveal itself, so no bar showed.
+    it('shows when Details is turned on for the reveal and a namespace still hides the bucket', async () => {
+      await pickNamespaces(['other']);
+
+      await reveal(DEBUG_LINE);
+
+      expect(note()).not.toBeNull();
+    });
+
+    // A reveal that found no bucket left the bar of the reveal before it.
+    it('goes when the next reveal names no bucket', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      await reveal(9_999);
+
+      expect(note()).toBeNull();
+    });
+
+    it('goes when a new log loads', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      view.logStore = logStoreFor(await recursiveLog());
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    // A host can rebuild its grid on re-attach, as Call Tree does, so the bar would name a row of the old one.
+    it('goes when the view is detached', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      view.remove();
+      document.body.append(view);
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    // Clear took focus back from an inspector click made while its go-to ran.
+    it('leaves focus where the user put it while Clear ran', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      const goTo = grid().goTo.bind(grid());
+      jest.spyOn(grid(), 'goTo').mockImplementation(async (path, options) => {
+        elsewhere.focus();
+        return goTo(path, options);
+      });
+
+      note()
+        ?.querySelector<HTMLElement>('[aria-label="Clear filters and go to the hidden row"]')
+        ?.click();
+      await settle();
+      await view.updateComplete;
+
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    });
   });
 
   it('moves to the bucket a picked inspector row names, and only marks for a hover', async () => {
-    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
     const bucketB = findRow(roots(), 'B').id;
 
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: false });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [2], sticky: false });
     await settle();
     expect(goTo).not.toHaveBeenCalled();
     // Frame 2 heads bucket B, and is the B caller row under the A it called.
     const callerB = findRow(findRow(roots(), 'A')._children ?? [], 'B').id;
     expect(grid().marked).toEqual(new Set([bucketB, callerB]));
 
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [2], sticky: true });
     await settle();
     expect(goTo).toHaveBeenCalledWith([bucketB], { scrollIfVisible: false });
   });
 
   describe('filters', () => {
     const MS = 1_000_000;
-    const row = (namespace: string, totalMs: number, selfMs: number, details = true) =>
+    const row = (namespace: string, totalMs: number, selfMs: number, frame = true) =>
       ({
         namespace,
         totalTime: totalMs * MS,
         totalSelfTime: selfMs * MS,
-        _hasDetailsDeep: details,
+        type: frame ? 'METHOD_ENTRY' : 'USER_DEBUG',
       }) as unknown as BottomUpRow;
     const kept = (rows: BottomUpRow[]) =>
       rows.filter((r) => grid().filters.every((filter) => filter.test(r)));
     /** The filters this toolbar adds, apart from Details. */
-    const added = () => grid().filters.filter((filter) => filter !== BOTTOM_UP_DETAILS);
+    const added = () => grid().filters.filter((filter) => filter !== BOTTOM_UP_WITHOUT_DETAILS);
     const fire = async (selector: string, type: string, detail: object) => {
       view.renderRoot
         .querySelector(selector)
@@ -307,10 +458,10 @@ describe('analysis-view', () => {
     });
 
     it('keeps the rows in the picked namespaces, with their callers, and Details still applies', async () => {
-      const [ns1, ns2, noDetails] = [row('ns1', 1, 1), row('ns2', 1, 1), row('ns1', 1, 1, false)];
+      const [ns1, ns2, detail] = [row('ns1', 1, 1), row('ns2', 1, 1), row('ns1', 1, 1, false)];
       await pickNamespaces(['ns1']);
 
-      expect(kept([ns1, ns2, noDetails])).toEqual([ns1]);
+      expect(kept([ns1, ns2, detail])).toEqual([ns1]);
       expect(added().map((filter) => filter.keepAncestors)).toEqual([true]);
     });
 
@@ -368,7 +519,7 @@ describe('analysis-view', () => {
     expect(grid().groupBy).toBeNull();
   });
 
-  it('shows the rows with no details when Details is on', async () => {
+  it('shows the detail rows when Details is on', async () => {
     view.renderRoot.querySelector<HTMLButtonElement>('button.pill-toggle')?.click();
     await view.updateComplete;
 
@@ -378,9 +529,9 @@ describe('analysis-view', () => {
   it('stops a rebuild that a newer log overtook', async () => {
     const bottomUp = jest.spyOn(MergedTree, 'bottomUp');
 
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
 
@@ -390,17 +541,17 @@ describe('analysis-view', () => {
 
   it('drops a build a newer log overtook while it read the limit usage', async () => {
     // The newer log lands after this tree resolves but before its usage read does.
-    const olderTree = await MergedTree.bottomUp(recursiveLog());
+    const olderTree = await MergedTree.bottomUp(logStoreFor(await recursiveLog()));
     let finish: (tree: typeof olderTree) => void = () => {};
     jest
       .spyOn(MergedTree, 'bottomUp')
       .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
       .mockImplementationOnce(() => new Promise(() => {}));
 
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     finish(olderTree);
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
     await view.updateComplete;
@@ -414,7 +565,7 @@ describe('analysis-view', () => {
     const shownGrid = grid();
     const before = roots();
 
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
     await view.updateComplete;
@@ -428,12 +579,10 @@ describe('analysis-view', () => {
   it('exports analysis.csv and copies from the grid', () => {
     const copy = jest.spyOn(grid(), 'copy').mockResolvedValue(undefined);
     const click = (label: string) =>
-      view.renderRoot
-        .querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)
-        ?.click();
+      view.renderRoot.querySelector<HTMLElement>(`toolbar-action[label="${label}"]`)?.click();
 
     click('Export to CSV');
-    click('Copy to clipboard');
+    click('Copy to Clipboard');
 
     expect(exportCsv).toHaveBeenCalledWith(grid(), 'analysis.csv');
     expect(copy).toHaveBeenCalled();
@@ -517,11 +666,10 @@ describe('analysis-view', () => {
 describe('analysis-view before it is seen', () => {
   it('builds nothing while the tab is hidden', async () => {
     globalThis.IntersectionObserver = NeverVisible as unknown as typeof IntersectionObserver;
-    byEventIndex = [];
     const view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
 

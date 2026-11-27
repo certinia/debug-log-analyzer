@@ -5,7 +5,7 @@
 import type { Container } from 'pixi.js';
 import { Graphics, Text } from 'pixi.js';
 
-import { formatWallClockTime } from '../../../../core/utility/Util.js';
+import { formatWallClockTime } from '#core/utility/Util.js';
 import type { TickInterval, TickLabelResult, TimeAxisLabelStrategy } from './MeshAxisRenderer.js';
 import { NS_PER_MS } from './timeAxisConstants.js';
 

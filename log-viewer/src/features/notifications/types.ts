@@ -80,6 +80,23 @@ export const SEVERITY_META: Readonly<Record<IssueSeverity, SeverityMeta>> = {
   },
 };
 
+/** The header's two issue lists: their chip, and their row once collapsed into `•••`. */
+export const ISSUE_SOURCES = {
+  problems: {
+    label: 'Log problems',
+    icon: 'pass',
+    noun: 'problem',
+    empty: 'No problems found in this log',
+  },
+  notifications: {
+    label: 'Notifications',
+    icon: 'bell',
+    noun: 'notification',
+    empty: 'Log parsed with no issues',
+  },
+} as const;
+export type IssueSource = keyof typeof ISSUE_SOURCES;
+
 /** The most severe severity present, or `null` for an empty list. */
 export function worstSeverity(issues: readonly LogIssue[]): IssueSeverity | null {
   return issues.reduce<IssueSeverity | null>(

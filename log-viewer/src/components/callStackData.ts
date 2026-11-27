@@ -1,40 +1,31 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { currentLogStore } from '../core/log/LogStore.js';
-import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
+import { currentLogStore } from '#core/log/LogStore.js';
 
 export interface CallStackRow {
-  eventIndex: number;
+  eventId: number;
   type: string;
   text: string;
   duration: { total: number; self: number };
 }
 
 /**
- * Flat, plain-object rows for the call-stack table — the lineage of parent
- * frames that led to `eventIndex`, outermost first (as `getStackByEventIndex`
+ * Flat, plain-object rows for the call-stack table — the lineage of parents
+ * that led to `eventId`, outermost first (as `LogStore.stackById`
  * returns them). `rootTotal` (the outermost frame's total, in ns) is the
  * denominator for the Total/Self percentage bars.
- *
- * Detail frames are dropped: the inspector's stack holds call frames only. A
- * `CUMULATIVE_LIMIT_USAGE` or `CUMULATIVE_PROFILING_BEGIN` block is a parent, so
- * it can be an ancestor of a selected row. `EXCLUDED_DETAIL_TYPES` names them
- * for the Call Tree tab, which keeps them visible; here they are the exclusion.
  */
-export function buildCallStackData(eventIndex: number): {
+export function buildCallStackData(eventId: number): {
   rows: CallStackRow[];
   rootTotal: number;
 } {
-  const stack = eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex) ?? []) : [];
-  const rows = stack
-    .filter((entry) => !EXCLUDED_DETAIL_TYPES.has(entry.type ?? ''))
-    .map((entry) => ({
-      eventIndex: entry.eventIndex,
-      type: entry.type ?? '',
-      text: entry.text,
-      duration: { total: entry.duration.total, self: entry.duration.self },
-    }));
-  // Taken after the filter, so the bars are a share of the outermost frame shown.
+  const stack = eventId >= 0 ? (currentLogStore()?.stackById(eventId) ?? []) : [];
+  const rows = stack.map((entry) => ({
+    eventId: entry.id,
+    type: entry.type,
+    text: entry.text ?? entry.type,
+    duration: { total: entry.duration.total, self: entry.duration.self },
+  }));
   return { rows, rootTotal: rows[0]?.duration.total ?? 0 };
 }

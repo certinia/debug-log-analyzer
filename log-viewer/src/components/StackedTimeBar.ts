@@ -6,7 +6,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import { formatDuration, formatInteger, sharePercent } from '../core/utility/Util.js';
+import { formatDuration, formatInteger, sharePercent } from '#core/utility/Util.js';
 import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
 

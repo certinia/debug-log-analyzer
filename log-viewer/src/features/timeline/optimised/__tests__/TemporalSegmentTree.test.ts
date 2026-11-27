@@ -2,34 +2,20 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
-
+import type { LogCategory } from '#core/log/category.js';
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
-import { timelineEvent } from '#test-helpers/timeline.js';
+import { type FrameSpec, rectsOf, timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
-import { legacyCullRectangles } from '../LegacyViewportCuller.js';
-import { RectangleCache } from '../RectangleCache.js';
 import { TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
 const NO_COLORS: Map<string, BatchColorInfo> = new Map();
-const CATEGORIES = new Set([
-  'Apex',
-  'Code Unit',
-  'System',
-  'Automation',
-  'DML',
-  'SOQL',
-  'Callout',
-  'Validation',
-]);
-
-function build(events: LogEvent[]): TemporalSegmentTree {
-  return new TemporalSegmentTree(new RectangleCache(events, CATEGORIES).getRectsByCategory());
+function build(events: FrameSpec[]): TemporalSegmentTree {
+  return new TemporalSegmentTree(rectsOf(events));
 }
 
-function query(events: LogEvent[], view: ViewportState) {
+function query(events: FrameSpec[], view: ViewportState) {
   const result = build(events).query(view, NO_COLORS);
   const buckets: PixelBucket[] = [...result.buckets.values()].flat();
   return {
@@ -40,7 +26,7 @@ function query(events: LogEvent[], view: ViewportState) {
 }
 
 describe('TemporalSegmentTree', () => {
-  it.each<[string, LogEvent[], number]>([
+  it.each<[string, FrameSpec[], number]>([
     [
       'flat events',
       [timelineEvent(0, 10, 'Apex'), timelineEvent(20, 10, 'SOQL'), timelineEvent(40, 10, 'DML')],
@@ -94,6 +80,21 @@ describe('TemporalSegmentTree', () => {
       ]);
     });
 
+    // 17 events need 3 branch levels, so the bucket takes its stats from the root's roll-up.
+    it('sums each category of a wide row into its bucket, counting a sub-1ns event as 1ns', () => {
+      const events = Array.from({ length: 17 }, (_, i) =>
+        i % 2 ? timelineEvent(i, 0.5, 'SOQL') : timelineEvent(i, 1, 'Apex'),
+      );
+
+      const result = query(events, makeViewport({ zoom: 0.01 }));
+
+      expect(result.all).toHaveLength(1);
+      expect(Object.fromEntries(result.all[0]!.categoryStats.byCategory)).toEqual({
+        Apex: { count: 9, totalDuration: 9 },
+        SOQL: { count: 8, totalDuration: 8 },
+      });
+    });
+
     // DML outranks SOQL, though SOQL has more events and more time in the bucket.
     it.each<[string, LogCategory[]]>([
       ['last', ['SOQL', 'SOQL', 'DML']],
@@ -107,15 +108,44 @@ describe('TemporalSegmentTree', () => {
       expect(result.buckets.get('SOQL') ?? []).toHaveLength(0);
     });
 
+    // A bucket is 2px wide, so at zoom 1 it spans 2ns and at zoom 0.5 it spans 4ns.
+    it.each<[number, number]>([
+      [1, 4],
+      [0.5, 2],
+    ])('places a bucket per depth on the pixel grid at zoom %d', (zoom, x) => {
+      const events = [timelineEvent(5, 1, 'Apex', [timelineEvent(5, 0.5, 'SOQL')])];
+
+      const result = query(events, makeViewport({ zoom }));
+
+      expect(result.all.sort((a, b) => a.depth - b.depth)).toEqual([
+        expect.objectContaining({ depth: 0, x, y: 0, firstStart: 5, lastStart: 5 }),
+        expect.objectContaining({
+          depth: 1,
+          x,
+          y: TIMELINE_CONSTANTS.EVENT_HEIGHT,
+          firstStart: 5,
+          lastStart: 5,
+        }),
+      ]);
+    });
+
+    it('keeps apart buckets that fall in different cells of one row', () => {
+      const events = [timelineEvent(0, 1, 'Apex'), timelineEvent(10, 1, 'Apex')];
+
+      const result = query(events, makeViewport());
+
+      expect(result.all.map((bucket) => bucket.firstStart).sort((a, b) => a - b)).toEqual([0, 10]);
+    });
+
     it.each<[number, number]>([
       [0.1, 0],
-      [1, 3],
+      [1, 2],
       [10, 3],
     ])('accounts for every event at zoom %d, drawing %d as rects', (zoom, drawn) => {
       const events = [
-        timelineEvent(0, 5, 'Apex'),
-        timelineEvent(10, 5, 'SOQL'),
-        timelineEvent(20, 5, 'DML'),
+        timelineEvent(0, 10, 'Apex'),
+        timelineEvent(20, 5, 'SOQL'),
+        timelineEvent(40, 1, 'DML'),
       ];
 
       const result = query(events, makeViewport({ zoom }));
@@ -155,27 +185,6 @@ describe('TemporalSegmentTree', () => {
 
       expect(result.total).toBe(expected);
     });
-
-    it('counts the same events as the legacy culler', () => {
-      const events = [
-        timelineEvent(0, 10, 'Apex'),
-        timelineEvent(20, 5, 'SOQL'),
-        timelineEvent(30, 3, 'DML'),
-        timelineEvent(40, 1, 'Apex'),
-      ];
-      const cache = new RectangleCache(events, CATEGORIES);
-
-      const tree = cache.getCulledRectangles(makeViewport(), NO_COLORS).stats;
-      const legacy = legacyCullRectangles(
-        cache.getRectsByCategory(),
-        makeViewport(),
-        NO_COLORS,
-      ).stats;
-
-      expect(tree.visibleCount + tree.bucketedEventCount).toBe(
-        legacy.visibleCount + legacy.bucketedEventCount,
-      );
-    });
   });
 
   // A branch's end is the latest end among its children, not the end of the last one to start.
@@ -204,13 +213,37 @@ describe('TemporalSegmentTree', () => {
       expect(result.visibleRects.get('SOQL')).toHaveLength(1);
     });
 
+    // Over 4 events in a row needs a second branch level; 17 and 65 leave a short last group.
+    it.each([5, 17, 65])('accounts for each of %d events in one row, at every zoom', (count) => {
+      const events = Array.from({ length: count }, (_, i) => timelineEvent(i * 10, 4, 'Apex'));
+      const tree = build(events);
+
+      for (const zoom of [0.01, 0.3, 1]) {
+        const result = tree.query(makeViewport({ zoom, displayWidth: 1000 * zoom }), NO_COLORS);
+        const bucketed = [...result.buckets.values()].flat();
+        const drawn = result.visibleRects.get('Apex') ?? [];
+        expect(drawn.length + bucketed.reduce((sum, b) => sum + b.eventCount, 0)).toBe(count);
+      }
+      // Rows are numbered in pre-order, so row i is event i.
+      expect(tree.queryRowsInRegion(0, 10 * count, 0, 0)).toEqual(events.map((_, i) => i));
+    });
+
+    it('finds a long first event two branch levels up, past 16 short ones', () => {
+      const events = [
+        timelineEvent(0, 1000, 'Apex'),
+        ...Array.from({ length: 16 }, (_, i) => timelineEvent(10 + i * 10, 1, 'SOQL')),
+      ];
+
+      expect(build(events).queryRowsInRegion(900, 950, 0, 0)).toEqual([0]);
+    });
+
     it('finds a long event by region, for hit testing', () => {
       const found = build([
         timelineEvent(0, 100, 'Apex'),
         timelineEvent(50, 10, 'SOQL'),
-      ]).queryEventsInRegion(70, 90, 0, 0);
+      ]).queryRowsInRegion(70, 90, 0, 0);
 
-      expect(found.map((event) => event.category)).toEqual(['Apex']);
+      expect(found).toEqual([0]);
     });
   });
 });

@@ -13,35 +13,31 @@ import {
   rowIdsByPath,
   type ScopedRow,
 } from '../../log-viewer/src/components/scopedCallTree.js';
-import { LogStore, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
+import { LogStore, logStoreFor, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
 import {
   toAggregatedCallTree,
   toBottomUpTree,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
 import { reportedUsage } from '../../log-viewer/src/features/call-tree/utils/reportedUsage.js';
-import { line, print, time } from './harness.js';
-
-// The builds slice themselves against this; resolving at once measures the work
-// rather than the frames it would hand back on screen.
-const yieldSlice = () => Promise.resolve();
+import { line, print, time, yieldSlice } from './harness.js';
 
 interface Shape {
   nodes: number;
-  /** Event indexes the rows store between them: what a row per occurrence costs.
+  /** Event ids the rows store between them: what a row per occurrence costs.
    *  A row that derives its own stores none. */
-  indexes: number;
+  ids: number;
   fattest: ScopedRow | null;
 }
 
 function shapeOf(rows: readonly ScopedRow[]): Shape {
-  const shape: Shape = { nodes: 0, indexes: 0, fattest: null };
+  const shape: Shape = { nodes: 0, ids: 0, fattest: null };
   const stack = [...rows];
   while (stack.length) {
     const row = stack.pop()!;
     shape.nodes += 1;
-    const held = row.eventIndexes?.length ?? 0;
-    shape.indexes += held;
-    if (held > (shape.fattest?.eventIndexes?.length ?? 0)) {
+    const held = row.eventIds?.length ?? 0;
+    shape.ids += held;
+    if (held > (shape.fattest?.eventIds?.length ?? 0)) {
       shape.fattest = row;
     }
     if (row._children) {
@@ -54,7 +50,8 @@ function shapeOf(rows: readonly ScopedRow[]): Shape {
 }
 
 export async function measureCallTree(log: ApexLog): Promise<void> {
-  setCurrentLog(log);
+  const store = logStoreFor(log);
+  setCurrentLog(store);
 
   const scoped = await time('buildWholeLogCallTree', () => buildWholeLogCallTree({ yieldSlice }));
   if (!scoped) {
@@ -72,7 +69,7 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
   ))!;
 
   const shape = shapeOf(bottomUp);
-  const counts = ({ nodes, indexes }: Shape) => `${nodes} nodes, ${indexes} indexes held`;
+  const counts = ({ nodes, ids }: Shape) => `${nodes} nodes, ${ids} ids held`;
   line('bottom-up', counts(shape));
   line('aggregated', counts(shapeOf(aggregated)));
   line('time-order', `${counts(shapeOf(timeOrder))}\n`);
@@ -83,12 +80,12 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
 
   // The mark, on the worst row there is: the frames a picked bucket counts,
   // translated into the ids of every row they name.
-  const picked = shape.fattest?.eventIndexes ?? [];
+  const picked = shape.fattest?.eventIds ?? [];
   print(`\nfattest row: ${picked.length} occurrences of "${shape.fattest?.text ?? ''}"`);
   const ids = new LocatedRowIds();
-  await time('mark callers (first)', () => ids.idsFor(log, picked, 'callers'));
-  await time('mark callers (same pick)', () => ids.idsFor(log, picked, 'callers'));
-  await time('mark callees', () => new LocatedRowIds().idsFor(log, picked, 'callees'));
+  await time('mark callers (first)', () => ids.idsFor(store, picked, 'callers'));
+  await time('mark callers (same pick)', () => ids.idsFor(store, picked, 'callers'));
+  await time('mark callees', () => new LocatedRowIds().idsFor(store, picked, 'callees'));
 
   // The Call Tree tab's own grouped builds, for comparison with the inspector's.
   print('');
@@ -96,12 +93,8 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
   // table. Only the first build below is cold; the second reads what the first
   // interned, as it does on screen where every view shares one table.
   const gridStore = new LogStore(log);
-  const gridPaths = gridStore.keyPathIds();
+  const gridIndex = await gridStore.logIndex({ yieldSlice });
   const usage = await time('grid reportedUsage', () => gridStore.derive(reportedUsage));
-  await time('grid toAggregatedCallTree', () =>
-    toAggregatedCallTree(log.children, gridPaths, undefined, usage),
-  );
-  await time('grid toBottomUpTree', () =>
-    toBottomUpTree(log.children, gridPaths, undefined, usage),
-  );
+  await time('grid toAggregatedCallTree', () => toAggregatedCallTree(gridIndex, gridStore, usage));
+  await time('grid toBottomUpTree', () => toBottomUpTree(gridIndex, gridStore, usage));
 }

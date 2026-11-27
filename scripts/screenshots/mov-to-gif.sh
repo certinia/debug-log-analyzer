@@ -17,7 +17,7 @@ set -euo pipefail
 SRC=${1:-}
 [ -n "$SRC" ] || { echo "usage: $(basename "$0") <recording>.mov [out.gif]" >&2; exit 1; }
 [ -f "$SRC" ] || { echo "no recording at $SRC" >&2; exit 1; }
-OUT=${2:-lana/assets/1_22/preview.gif}
+OUT=${2:-lana/assets/1_24/preview.gif}
 WIDTH=${WIDTH:-1800}
 FPS=${FPS:-12}      # smooth enough for UI motion, and frames are what cost bytes
 COLORS=${COLORS:-128} # a dark editor theme needs nowhere near 256

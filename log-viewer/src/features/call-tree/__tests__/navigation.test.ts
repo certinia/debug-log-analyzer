@@ -7,10 +7,10 @@ import { describe, expect, it } from '@jest/globals';
 
 import { CALLTREE_GO_TO_ROW, goToCallTreeAction, goToRow } from '../navigation.js';
 
-function captureEventIndexes(): { seen: number[]; stop: () => void } {
+function captureEventIds(): { seen: number[]; stop: () => void } {
   const seen: number[] = [];
-  const listener = ((e: CustomEvent<{ eventIndex: number }>) => {
-    seen.push(e.detail.eventIndex);
+  const listener = ((e: CustomEvent<{ eventId: number }>) => {
+    seen.push(e.detail.eventId);
   }) as EventListener;
   document.addEventListener(CALLTREE_GO_TO_ROW, listener);
 
@@ -19,7 +19,7 @@ function captureEventIndexes(): { seen: number[]; stop: () => void } {
 
 describe('goToCallTreeAction', () => {
   it('is a labelled issue action that navigates when run', () => {
-    const { seen, stop } = captureEventIndexes();
+    const { seen, stop } = captureEventIds();
     const action = goToCallTreeAction(7);
 
     expect(action.label).toBe('Go to call tree');
@@ -31,14 +31,14 @@ describe('goToCallTreeAction', () => {
 });
 
 describe('goToRow', () => {
-  it('dispatches the go-to-row event on document with the eventIndex', async () => {
+  it('dispatches the go-to-row event on document with the eventId', async () => {
     const seen: number[] = [];
-    const listener = ((e: CustomEvent<{ eventIndex: number }>) => {
-      seen.push(e.detail.eventIndex);
+    const listener = ((e: CustomEvent<{ eventId: number }>) => {
+      seen.push(e.detail.eventId);
     }) as EventListener;
     document.addEventListener(CALLTREE_GO_TO_ROW, listener);
 
-    await goToRow({ eventIndex: 42 });
+    await goToRow({ eventId: 42 });
 
     document.removeEventListener(CALLTREE_GO_TO_ROW, listener);
     expect(seen).toEqual([42]);

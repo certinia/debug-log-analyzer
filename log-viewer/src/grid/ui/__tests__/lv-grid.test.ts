@@ -725,10 +725,17 @@ describe('lv-grid', () => {
 
   it('opens the path to a row, then selects it', async () => {
     const { grid, rowNamed, names } = await setup();
-    expect(await grid.goTo([2, 22])).toBe(true);
+    expect(await grid.goTo([2, 22])).toBe('selected');
     await settle(grid);
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     expect(rowNamed('b2')?.ariaSelected).toBe('true');
+  });
+
+  // A caller told only "false" could not tell a hidden row from a selection that won.
+  it('says when no row on the path is shown', async () => {
+    const { grid } = await setup();
+
+    expect(await grid.goTo([99])).toBe('none-shown');
   });
 
   it('finds a row of a source set in the same turn', async () => {
@@ -738,7 +745,7 @@ describe('lv-grid', () => {
       key: (row) => row.key,
     };
 
-    expect(await grid.goTo([9])).toBe(true);
+    expect(await grid.goTo([9])).toBe('selected');
     await settle(grid);
     expect(rowNamed('z')?.ariaSelected).toBe('true');
   });
@@ -769,9 +776,18 @@ describe('lv-grid', () => {
     const stale = grid.goTo([2, 22]);
     other(grid);
 
-    expect(await stale).toBe(false);
+    expect(await stale).toBe('superseded');
     await settle(grid);
     expect(rowNamed('b2')?.ariaSelected).not.toBe('true');
+  });
+
+  it('says it gave way, not that no row is shown, when overtaken on a path with no shown row', async () => {
+    const { grid } = await setup();
+
+    const stale = grid.goTo([99]);
+    void grid.goTo([1]);
+
+    expect(await stale).toBe('superseded');
   });
 
   it('gives way to a click made while it opens the path', async () => {
@@ -780,7 +796,7 @@ describe('lv-grid', () => {
     const stale = grid.goTo([2, 22]);
     rowNamed('a')?.querySelector<HTMLElement>('.cell')?.click();
 
-    expect(await stale).toBe(false);
+    expect(await stale).toBe('superseded');
     await settle(grid);
     expect(rowNamed('a')?.ariaSelected).toBe('true');
   });
@@ -971,8 +987,8 @@ describe('lv-grid', () => {
     expect(rowNamed('a')?.className).toBe('row');
   });
 
-  it('shows the placeholder only while no row passes the filters', async () => {
-    const { grid, root } = await setup({ placeholder: 'Nothing here' });
+  it('shows the filtered text only while no row passes the filters', async () => {
+    const { grid, root } = await setup();
     const placeholder = (): string | undefined =>
       root.querySelector('.placeholder')?.textContent?.trim();
     expect(placeholder()).toBeUndefined();
@@ -980,7 +996,7 @@ describe('lv-grid', () => {
     const none = [{ test: () => false }];
     grid.filters = none;
     await settle(grid);
-    expect(placeholder()).toBe('Nothing here');
+    expect(placeholder()).toBe('No results match your filters');
     const rowIndexes = [...root.querySelectorAll('.scroller > *')].map((el) => [
       el.getAttribute('role'),
       el.getAttribute('aria-rowindex'),
@@ -992,12 +1008,26 @@ describe('lv-grid', () => {
     ]);
     expect(root.querySelector('.scroller')?.getAttribute('aria-rowcount')).toBe('3');
     expect(root.querySelector('[role="gridcell"] > [role="status"]')?.textContent).toBe(
-      'Nothing here',
+      'No results match your filters',
     );
 
     grid.filters = [];
     await settle(grid);
     expect(placeholder()).toBeUndefined();
+  });
+
+  it('says the filters hide every row, not that there is no data, when the source has rows', async () => {
+    const { grid, root } = await setup({
+      placeholder: 'No DML statements found',
+      filters: [{ test: () => false }],
+    });
+    const placeholder = (): string | undefined =>
+      root.querySelector('.placeholder')?.textContent?.trim();
+    expect(placeholder()).toBe('No results match your filters');
+
+    grid.source = { roots: [], key: (row: Node) => row.key };
+    await settle(grid);
+    expect(placeholder()).toBe('No DML statements found');
   });
 
   it('filters and totals again on refresh', async () => {
@@ -1020,7 +1050,6 @@ describe('lv-grid', () => {
     const held = new Promise<void>((resolve) => (release = resolve));
     let clock = 0;
     const { root, grid } = await setup({
-      placeholder: 'Nothing here',
       // The build checks its clock every 256 rows, so it needs more rows than that to yield.
       source: {
         roots: Array.from({ length: 600 }, (_, i) => ({
@@ -1038,11 +1067,20 @@ describe('lv-grid', () => {
 
     release();
     await settle(grid);
-    expect(root.querySelector('.placeholder')?.textContent?.trim()).toBe('Nothing here');
+    expect(root.querySelector('.placeholder')?.textContent?.trim()).toBe(
+      'No results match your filters',
+    );
   });
 
-  it('shows no placeholder when it has none', async () => {
-    const { root } = await setup({ filters: [{ test: () => false }] });
+  it('shows no notice when the text for its case is null', async () => {
+    const { grid, root } = await setup({
+      filters: [{ test: () => false }],
+      filteredPlaceholder: null,
+    });
+    expect(root.querySelector('.placeholder')).toBeNull();
+
+    grid.source = { roots: [], key: (row: Node) => row.key };
+    await settle(grid);
     expect(root.querySelector('.placeholder')).toBeNull();
   });
 

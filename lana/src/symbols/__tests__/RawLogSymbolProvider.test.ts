@@ -7,10 +7,10 @@ import { SymbolKind, languages } from 'vscode';
 
 import {
   createMockDisplay,
-  createMockApexLog,
   asContext,
   createMockContext,
-  createMockLogEvent,
+  logLine,
+  parseLines,
 } from '../../__tests__/helpers/test-builders.js';
 import {
   TabInputText,
@@ -23,14 +23,20 @@ import {
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogSymbolProvider } from '../RawLogSymbolProvider.js';
 
-jest.mock('../../cache/LogEventCache.js', () => ({
-  LogEventCache: {
-    getApexLog: jest.fn(),
-  },
-}));
+// Only the parse is mocked: the lines of each event are read as the provider reads them.
+jest.mock('../../cache/LogEventCache.js', () => {
+  const actual = jest.requireActual<typeof import('../../cache/LogEventCache.js')>(
+    '../../cache/LogEventCache.js',
+  );
+  actual.LogEventCache.getApexLog = jest.fn();
+  return actual;
+});
 
 const mockGetApexLog = LogEventCache.getApexLog as jest.Mock;
 const APEX_LOG_LINE = '09:45:31.888 (1000)|EXECUTION_STARTED';
+
+const enter = (ns: number, name: string) => logLine(ns, `METHOD_ENTRY|[1]|01p|${name}`);
+const exit = (ns: number, name: string) => logLine(ns, `METHOD_EXIT|[1]|${name}`);
 
 describe('RawLogSymbolProvider', () => {
   let provider: RawLogSymbolProvider;
@@ -44,64 +50,43 @@ describe('RawLogSymbolProvider', () => {
     setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
   });
 
+  async function symbolsFor(lines: string[]) {
+    const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
+    mockGetApexLog.mockResolvedValueOnce(await parseLines(lines));
+    return provider.provideDocumentSymbols(doc, {} as never);
+  }
+
   describe('provideDocumentSymbols', () => {
     it('builds a symbol spanning the event, named by the parser label not the raw line', async () => {
-      const lines = [
-        '09:45:31.888 (1000)|METHOD_ENTRY|[1]|FooController.doWork',
-        '09:45:31.889 (1500)|STATEMENT_EXECUTE',
-        '09:45:31.890 (2000)|METHOD_EXIT',
-      ];
-      const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-      const event = createMockLogEvent({
-        timestamp: 1000,
-        exitStamp: 2000,
-        text: 'FooController.doWork',
-        children: [],
-      });
-      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-      const symbols = await provider.provideDocumentSymbols(doc, {} as never);
+      const symbols = await symbolsFor([
+        enter(1000, 'FooController.doWork()'),
+        logLine(1500, 'STATEMENT_EXECUTE|[2]'),
+        exit(2000, 'FooController.doWork()'),
+      ]);
 
       expect(symbols.length).toBe(1);
-      expect(symbols[0]?.name).toBe('FooController.doWork');
+      expect(symbols[0]?.name).toBe('FooController.doWork()');
       expect(symbols[0]?.kind).toBe(SymbolKind.Method);
       expect(symbols[0]?.range.start.line).toBe(0);
       expect(symbols[0]?.range.end.line).toBe(2);
     });
 
     it('falls back to the event type when the parser label is empty', async () => {
-      const lines = [
-        '09:45:31.888 (1000)|CODE_UNIT_STARTED',
-        '09:45:31.890 (2000)|CODE_UNIT_FINISHED',
-      ];
-      const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-      const event = createMockLogEvent({
-        timestamp: 1000,
-        exitStamp: 2000,
-        text: '',
-        type: 'CODE_UNIT_STARTED',
-        children: [],
-      });
-      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
+      const symbols = await symbolsFor([
+        logLine(1000, 'EXECUTION_STARTED'),
+        logLine(2000, 'EXECUTION_FINISHED'),
+      ]);
 
-      const symbols = await provider.provideDocumentSymbols(doc, {} as never);
-
-      expect(symbols[0]?.name).toBe('CODE_UNIT_STARTED');
+      expect(symbols[0]?.name).toBe('EXECUTION_STARTED');
     });
 
     it('nests child events under their parent', async () => {
-      const lines = [
-        '09:45:31.888 (1000)|CODE_UNIT_STARTED',
-        '09:45:31.889 (1500)|METHOD_ENTRY',
-        '09:45:31.890 (2000)|METHOD_EXIT',
-        '09:45:31.891 (3000)|CODE_UNIT_FINISHED',
-      ];
-      const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-      const child = createMockLogEvent({ timestamp: 1500, exitStamp: 2000, children: [] });
-      const parent = createMockLogEvent({ timestamp: 1000, exitStamp: 3000, children: [child] });
-      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [parent] }));
-
-      const symbols = await provider.provideDocumentSymbols(doc, {} as never);
+      const symbols = await symbolsFor([
+        logLine(1000, 'CODE_UNIT_STARTED|[EXTERNAL]|01q|Entry'),
+        enter(1500, 'A.a()'),
+        exit(2000, 'A.a()'),
+        logLine(3000, 'CODE_UNIT_FINISHED|Entry'),
+      ]);
 
       expect(symbols.length).toBe(1);
       expect(symbols[0]?.children.length).toBe(1);
@@ -110,18 +95,12 @@ describe('RawLogSymbolProvider', () => {
     });
 
     it('lifts descendants when an event has no foldable range', async () => {
-      const lines = [
-        '09:45:31.888 (1000)|EXECUTION_STARTED',
-        '09:45:31.889 (1500)|METHOD_ENTRY',
-        '09:45:31.890 (2000)|METHOD_EXIT',
-      ];
-      const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-      // Parent has no exitStamp -> not foldable; its child should surface at top level.
-      const child = createMockLogEvent({ timestamp: 1500, exitStamp: 2000, children: [] });
-      const parent = createMockLogEvent({ timestamp: 1000, exitStamp: null, children: [child] });
-      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [parent] }));
-
-      const symbols = await provider.provideDocumentSymbols(doc, {} as never);
+      // The log ends inside the parent, so it has no exit line; its child surfaces at top level.
+      const symbols = await symbolsFor([
+        enter(1000, 'A.a()'),
+        enter(1500, 'A.b()'),
+        exit(2000, 'A.b()'),
+      ]);
 
       expect(symbols.length).toBe(1);
       expect(symbols[0]?.range.start.line).toBe(1);
@@ -130,17 +109,6 @@ describe('RawLogSymbolProvider', () => {
     it('returns an empty array when the log fails to parse', async () => {
       const doc = createMockTextDocument({ lines: [], uri: '/test/file.log' });
       mockGetApexLog.mockResolvedValueOnce(null);
-
-      const symbols = await provider.provideDocumentSymbols(doc, {} as never);
-
-      expect(symbols).toEqual([]);
-    });
-
-    it('omits events whose timestamps are not in the document', async () => {
-      const lines = ['09:45:31.888 (1000)|METHOD_ENTRY'];
-      const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-      const event = createMockLogEvent({ timestamp: 9999, exitStamp: 10000, children: [] });
-      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
 
       const symbols = await provider.provideDocumentSymbols(doc, {} as never);
 

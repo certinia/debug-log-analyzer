@@ -9,8 +9,7 @@
  * Separates "what to draw" from "how to draw it" to eliminate coupling between renderers.
  *
  * Responsibilities:
- * - Pre-compute all rectangles from event tree (once at initialization)
- * - Maintain spatial index (rectsByCategory) for efficient access
+ * - Maintain the spatial index (a TemporalSegmentTree over the frames' rows)
  * - Perform viewport culling on demand
  * - Provide culled rectangles to any consumer (renderers)
  *
@@ -20,13 +19,12 @@
  * - Implement any search logic
  */
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type {
   CulledRenderData,
+  RectColumns,
   RenderRectangle,
   ViewportState,
 } from '../types/flamechart.types.js';
-import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { BatchColorInfo } from './BucketColorResolver.js';
 import { TemporalSegmentTree } from './TemporalSegmentTree.js';
 
@@ -35,9 +33,6 @@ import { TemporalSegmentTree } from './TemporalSegmentTree.js';
  * Stored once at construction to avoid recalculating every frame.
  */
 export interface PrecomputedRect extends RenderRectangle {
-  /** Unique ID for this rectangle */
-  id: string;
-
   /** Timestamp in nanoseconds (fixed) */
   timeStart: number;
 
@@ -50,14 +45,8 @@ export interface PrecomputedRect extends RenderRectangle {
   /** Total duration in nanoseconds including children (fixed) */
   duration: number;
 
-  /** Self duration in nanoseconds excluding children (fixed, for category resolution) */
-  selfDuration: number;
-
   /** Event category for color batching (fixed) */
   category: string;
-
-  /** Reference to original event (fixed) */
-  eventRef: LogEvent;
 
   /** Screen X position (updated during culling) */
   x: number;
@@ -73,59 +62,24 @@ export interface PrecomputedRect extends RenderRectangle {
 }
 
 /**
- * Rectangles built ahead, as `TimelineFrames` holds them.
- * When provided, RectangleCache skips its own flattenEvents traversal.
- */
-export interface PrecomputedRectData {
-  rectsByCategory: Map<string, PrecomputedRect[]>;
-  /** Pre-grouped by depth for TemporalSegmentTree (optional - computed if not provided) */
-  rectsByDepth?: Map<number, PrecomputedRect[]>;
-}
-
-/**
- * RectangleCache
- *
- * Manages rectangle pre-computation, spatial indexing, and viewport culling.
- * Provides a clean API for renderers to consume rectangle data without coupling.
- *
- * Uses TemporalSegmentTree for O(log n) viewport culling.
- * For O(n) legacy culling, use LegacyViewportCuller directly.
+ * Indexes the rows with a rect and answers viewport and region queries through a
+ * TemporalSegmentTree. Nothing reaches past it to the tree.
  */
 export class RectangleCache {
-  /** Spatial index: all rectangles grouped by category */
-  private rectsByCategory: Map<string, PrecomputedRect[]> = new Map();
-
   /** Segment tree for O(log n) viewport culling */
   private segmentTree: TemporalSegmentTree;
 
-  /**
-   * Create RectangleCache with either raw events or precomputed data.
-   *
-   * @param events - Event tree to pre-compute rectangles from
-   * @param categories - Set of valid categories for spatial indexing
-   * @param precomputed - Optional rectangles built ahead
-   */
-  constructor(events: LogEvent[], categories: Set<string>, precomputed?: PrecomputedRectData) {
-    if (precomputed) {
-      this.rectsByCategory = precomputed.rectsByCategory;
-      for (const rects of this.rectsByCategory.values()) {
-        sortByStartIfNeeded(rects);
-      }
-    } else {
-      // Legacy path: compute rectangles from events
-      this.precomputeRectangles(events, categories);
-    }
-
-    // Pass pre-grouped rectsByDepth if available (saves ~12ms grouping iteration)
-    this.segmentTree = new TemporalSegmentTree(this.rectsByCategory, precomputed?.rectsByDepth);
+  /** @param columns - The frames, by row; only the rows with a rect are indexed */
+  constructor(columns: RectColumns) {
+    this.segmentTree = new TemporalSegmentTree(columns);
   }
 
   /**
    * Get culled rectangles and buckets for current viewport.
    * Uses TemporalSegmentTree for O(log n) performance.
    *
-   * Events > MIN_RECT_SIZE (2px) are returned as visible rectangles.
-   * Events <= MIN_RECT_SIZE are aggregated into time-aligned buckets.
+   * Events wider than BUCKET_WIDTH are returned as visible rectangles.
+   * Events up to BUCKET_WIDTH wide are aggregated into time-aligned buckets.
    *
    * @param viewport - Current viewport state
    * @param batchColors - Theme-aware category colors for bucket color resolution
@@ -141,131 +95,22 @@ export class RectangleCache {
   }
 
   /**
-   * Get the rectangles, grouped by category and each ascending by timeStart.
-   * Read by the legacy culler and by the minimap, which sweeps them for its skyline.
-   *
-   * @returns Map of category to rectangles
-   */
-  public getRectsByCategory(): Map<string, PrecomputedRect[]> {
-    return this.rectsByCategory;
-  }
-
-  /**
-   * Query events within a specific time and depth region.
+   * Query the rows with a rect within a specific time and depth region.
    * Delegates to TemporalSegmentTree for O(log n + k) performance.
-   * Used for hit testing when bucket eventRefs are empty.
+   * Used for hit testing.
    *
    * @param timeStart - Start time in nanoseconds
    * @param timeEnd - End time in nanoseconds
    * @param depthStart - Minimum depth (inclusive)
    * @param depthEnd - Maximum depth (inclusive)
-   * @returns Array of LogEvent references in the region
+   * @returns The rows in the region
    */
-  public queryEventsInRegion(
+  public queryRowsInRegion(
     timeStart: number,
     timeEnd: number,
     depthStart: number,
     depthEnd: number,
-  ): LogEvent[] {
-    return this.segmentTree.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
-  }
-
-  // ============================================================================
-  // PRIVATE METHODS
-  // ============================================================================
-
-  /**
-   * Pre-compute all rectangles from event tree.
-   * Creates a flat spatial index for fast culling during render.
-   *
-   * @param events - Root events to process
-   * @param categories - Valid categories for indexing
-   */
-  private precomputeRectangles(events: LogEvent[], categories: Set<string>): void {
-    // Initialize category arrays
-    for (const category of categories) {
-      this.rectsByCategory.set(category, []);
-    }
-
-    // Flatten event tree into rectangles
-    this.flattenEvents(events, 0);
-
-    // Sort rectangles by timeStart for early exit during culling
-    // This enables breaking out of the loop when we've passed the viewport
-    for (const rects of this.rectsByCategory.values()) {
-      rects.sort((a, b) => a.timeStart - b.timeStart);
-    }
-  }
-
-  /**
-   * Iteratively flatten event tree into pre-computed rectangles.
-   * Uses parallel stacks to avoid recursion for better performance.
-   *
-   * @param events - Events at root level
-   * @param startDepth - Starting depth (0-indexed)
-   */
-  private flattenEvents(events: LogEvent[], startDepth: number): void {
-    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
-
-    // Parallel stacks for iterative traversal
-    const stackEvents: LogEvent[][] = [events];
-    const stackDepths: number[] = [startDepth];
-    let stackSize = 1;
-
-    while (stackSize > 0) {
-      // Pop from parallel stacks
-      stackSize--;
-      const currentEvents = stackEvents[stackSize]!;
-      const depth = stackDepths[stackSize]!;
-      const depthY = depth * eventHeight;
-
-      // Process all events at current depth
-      const len = currentEvents.length;
-      for (let i = 0; i < len; i++) {
-        const event = currentEvents[i]!;
-        const { duration, category, timestamp, exitStamp, children } = event;
-
-        // Check if this event should be rendered
-        if (duration.total && category) {
-          const rects = this.rectsByCategory.get(category);
-          if (rects) {
-            // Create persistent rect object (updated during culling)
-            // ID format: timestamp-depth-childIndex
-            const rect: PrecomputedRect = {
-              id: `${timestamp}-${depth}-${i}`,
-              timeStart: timestamp,
-              timeEnd: exitStamp ?? timestamp,
-              depth,
-              duration: duration.total,
-              selfDuration: duration.self,
-              category,
-              eventRef: event,
-              x: 0,
-              y: depthY,
-              width: 0,
-              height: eventHeight,
-            };
-            rects.push(rect);
-          }
-        }
-
-        // Push children onto parallel stacks for processing at depth + 1
-        if (children?.length) {
-          stackEvents[stackSize] = children;
-          stackDepths[stackSize] = depth + 1;
-          stackSize++;
-        }
-      }
-    }
-  }
-}
-
-// A check costs less than the sort, and the frames arrive sorted on a well-formed log.
-function sortByStartIfNeeded(rects: PrecomputedRect[]): void {
-  for (let i = 1; i < rects.length; i++) {
-    if (rects[i]!.timeStart < rects[i - 1]!.timeStart) {
-      rects.sort((a, b) => a.timeStart - b.timeStart);
-      return;
-    }
+  ): number[] {
+    return this.segmentTree.queryRowsInRegion(timeStart, timeEnd, depthStart, depthEnd);
   }
 }

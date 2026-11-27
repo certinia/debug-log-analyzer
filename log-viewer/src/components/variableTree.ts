@@ -5,13 +5,13 @@ import type {
   AggregateVariables,
   SpreadValue,
   VariableSpread,
-} from '../core/log/aggregateVariables.js';
+} from '#core/log/aggregateVariables.js';
 import {
   NOT_RECORDED,
   type FrameVariables,
   type IndexView,
   type VariableRow,
-} from '../core/log/frameVariables.js';
+} from '#core/log/frameVariables.js';
 import {
   assembledContainer,
   clampRaw,
@@ -19,7 +19,7 @@ import {
   parseVariableValue,
   type ValueEntry,
   type VariableValue,
-} from '../core/log/variableValue.js';
+} from '#core/log/variableValue.js';
 
 /**
  * The Variables section as one flat list of rows.
@@ -60,8 +60,7 @@ export interface Shown {
   address: string | null;
   /** True where {@link raw} came from that address rather than from this row. */
   resolved: boolean;
-  /** Where the log first describes the object, where that is after this frame. */
-  laterAt: number | null;
+  laterWriteId: number | null;
   /** The class of the object shown, where the log names it. More telling than
    *  the declared type, which is often only an interface. */
   className: string | null;
@@ -152,7 +151,7 @@ function shown(
     raw,
     address,
     resolved: state.text !== null,
-    laterAt: state.laterAt,
+    laterWriteId: state.laterWriteId,
     className: (objectAddress && lookups.classOf?.(objectAddress)) || null,
     objectAddress,
     parts,
@@ -413,7 +412,7 @@ export function toTreeRows(
         name: 'this',
         count: frame.fields.length,
         expandable: frame.fields.length > 0,
-        self: self && { ...self, declaredType: frame.thisRow?.declaredType ?? frame.thisType },
+        self: self && { ...self, declaredType: frame.thisType },
       },
       // The frame's own object, so a field pointing back at it cannot reopen it.
       (depth) =>
@@ -462,7 +461,7 @@ export function toTreeRows(
 export function toSpreadRows(
   aggregate: AggregateVariables,
   isOpen: (id: string, openByDefault: boolean) => boolean,
-  lookupsAt: (cut: number) => Lookups = () => ({}),
+  lookupsAt: (readAt: number) => Lookups = () => ({}),
 ): VariableTreeRow[] {
   const { rows, note, group, node, value } = rowEmitter(isOpen);
 
@@ -478,7 +477,7 @@ export function toSpreadRows(
         depth,
         shownOf(only, lookupsAt),
         NOTHING_OPEN,
-        lookupsAt(only.cut),
+        lookupsAt(only.readAt),
       );
       return;
     }
@@ -491,7 +490,7 @@ export function toSpreadRows(
           inside,
           shownOf(entry, lookupsAt),
           NOTHING_OPEN,
-          lookupsAt(entry.cut),
+          lookupsAt(entry.readAt),
         );
       });
     });
@@ -535,11 +534,11 @@ export function toSpreadRows(
  *
  *  Only a value the log wrote as an address asks the log anything, so a scalar
  *  never builds a view it would not read. */
-function shownOf(value: SpreadValue, lookupsAt: (cut: number) => Lookups): Shown {
+function shownOf(value: SpreadValue, lookupsAt: (readAt: number) => Lookups): Shown {
   // The object the value is, which is what opens it - the log names it beside a
   // serialised value as well as in place of one.
   const object = value.address ?? value.objectAddress;
-  const lookups = object ? lookupsAt(value.cut) : {};
+  const lookups = object ? lookupsAt(value.readAt) : {};
   return shown(value.text, value.address, object, lookups);
 }
 

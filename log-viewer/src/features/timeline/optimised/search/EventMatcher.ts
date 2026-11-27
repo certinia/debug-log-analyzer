@@ -6,7 +6,7 @@
  * EventMatcher
  *
  * Generic event searcher for timeline events.
- * Decoupled from LogEvent-specific implementation, works with any EventNode type.
+ * Decoupled from ApexEvent-specific implementation, works with any EventNode type.
  *
  * Responsibilities:
  * - Scan the shown frames in pre-order
@@ -15,9 +15,8 @@
  * - Track current search state
  */
 
-import { CHECK_EVERY, frameBudget, type Tick } from '../../../../core/utility/FrameBudget.js';
-import type { PrecomputedRect } from '../RectangleCache.js';
-import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '#core/utility/FrameBudget.js';
+import { type EventNode, rectCategory, type TimelineFrames } from '../../types/flamechart.types.js';
 import type { FramePredicate, SearchCursor, SearchMatch } from '../../types/search.types.js';
 import { SearchCursorImpl } from './SearchCursor.js';
 
@@ -84,9 +83,8 @@ export class EventMatcher<E extends EventNode> {
         row = frames.subtreeEnd[row]!;
         continue;
       }
-      const rect = frames.rectOf(row);
-      if (rect && predicate(frames.text(row), frames.type(row))) {
-        matches.push(new RowMatch(frames, row, rect));
+      if (frames.hasRect(row) && predicate(frames.text(row), frames.type(row))) {
+        matches.push(new RowMatch(frames, row));
       }
       row++;
     }
@@ -110,19 +108,29 @@ export function textPredicate(searchText: string, caseSensitive = false): FrameP
 
 // Builds its event only when asked: a search can match a hundred thousand frames.
 class RowMatch<E extends EventNode> implements SearchMatch<E> {
-  readonly rect: PrecomputedRect;
   private readonly frames: TimelineFrames<E>;
-  private readonly row: number;
+  readonly row: number;
   private built?: E;
 
-  constructor(frames: TimelineFrames<E>, row: number, rect: PrecomputedRect) {
+  constructor(frames: TimelineFrames<E>, row: number) {
     this.frames = frames;
     this.row = row;
-    this.rect = rect;
+  }
+
+  get timeStart(): number {
+    return this.frames.start[this.row]!;
+  }
+
+  get duration(): number {
+    return this.frames.total[this.row]!;
+  }
+
+  get category(): string {
+    return rectCategory(this.frames, this.row);
   }
 
   get depth(): number {
-    return this.rect.depth;
+    return this.frames.depth[this.row]!;
   }
 
   get matchType(): 'text' {

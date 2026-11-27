@@ -11,13 +11,13 @@ import {
   type DetailSource,
   type SelectionView,
   eventBus,
-} from '../core/events/EventBus.js';
-import { SubscriptionController } from '../core/events/SubscriptionController.js';
+} from '#core/events/EventBus.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
 import type { InspectorLocateEvent, InspectorRevealEvent } from './inspectorReveal.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { RangeScopeController, type TimeWindow } from '../core/log/rangeScope.js';
-import { debounce } from '../core/utility/Util.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { RangeScopeController, type TimeWindow } from '#core/log/rangeScope.js';
+import { debounce } from '#core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { emptyTextFor } from './detailEmptyText.js';
 import { buildDetailSections } from './detailSections.js';
@@ -31,7 +31,12 @@ import {
   scopedRecord,
   withoutScope,
 } from './inspectorLayout.js';
-import { RESET_SECTIONS_ID, buildSectionMenuItems, sectionIdFor } from './sectionMenu.js';
+import {
+  RESET_SECTIONS_ID,
+  RESET_SIZE_ID,
+  buildSectionMenuItems,
+  sectionIdFor,
+} from './sectionMenu.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
@@ -48,6 +53,11 @@ const SCOPE_OPTIONS: readonly ViewModeOption[] = [
   { value: 'selection', label: 'Detail' },
   { value: 'log', label: 'Summary' },
 ];
+
+// Beside the main view: the narrowest at which the inspector's tables keep every column.
+const DEFAULT_SIDE_SIZE = '560px';
+// Below it: VS Code's own bottom panel default.
+const DEFAULT_BOTTOM_SIZE = '33.333%';
 
 /**
  * The window the summary is reading, as elapsed times, so it reads against the
@@ -68,8 +78,8 @@ function windowLabel(window: TimeWindow): string {
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
  * via a forwarded `main` slot) so it crosscuts every tab. It follows the active
  * tab: each source's latest selection is remembered, and it shows the active
- * tab's selection. Persists dock position/size (public settings) plus its
- * open/closed state and its section layout (private globalState).
+ * tab's selection. Persists dock position (public setting) plus its size,
+ * open/closed state and section layout (private globalState).
  *
  * Collapse, order and which sections show are remembered per section list — per
  * tab and per scope, see {@link layoutKey} — because one id means different
@@ -92,8 +102,11 @@ export class LogInspector extends LitElement {
   private sections: PaneSection[] = [];
   @state()
   private dock: DockPosition = 'right';
+  // A width beside the main view and a height below it, as one never fits the other.
   @state()
-  private panelSize = 560;
+  private sidePanelSize: number | null = null;
+  @state()
+  private bottomPanelSize: number | null = null;
 
   // Keyed `<source>:<scope>:<section id>`, so the same section keeps its own
   // state in each list it appears in.
@@ -105,6 +118,9 @@ export class LogInspector extends LitElement {
   // The sections a list is set to hide, keyed like the collapse record.
   @state()
   private hiddenSections: Record<string, boolean> = {};
+  // Keyed `<source>:<scope>`; never persisted, as a log opening maximized reads as a fault.
+  @state()
+  private _maximized: Record<string, string | null> = {};
   // Bumped by a reset, which hands the panes' sizes back to automatic.
   @state()
   private _layoutEpoch = 0;
@@ -173,9 +189,10 @@ export class LogInspector extends LitElement {
         // The load can land after the user has already opened or laid out the
         // panel, so their own choice always wins over the stored one.
         this._visiblePref ??= panel.visible ?? null;
+        this.sidePanelSize ??= panel.sideSize ?? null;
+        this.bottomPanelSize ??= panel.bottomSize ?? null;
         if (!this._userAdjusted) {
           this.dock = panel.position;
-          this.panelSize = panel.size;
           this.collapsedSections = panel.collapsed ?? {};
           this.sectionOrder = panel.sectionOrder ?? {};
           this.hiddenSections = panel.hiddenSections ?? {};
@@ -251,18 +268,22 @@ export class LogInspector extends LitElement {
     return html`
       <dock-layout
         dock=${this.dock}
-        .size=${this.panelSize}
+        .size=${this.dock === 'bottom' ? this.bottomPanelSize : this.sidePanelSize}
+        defaultSize=${this.dock === 'bottom' ? DEFAULT_BOTTOM_SIZE : DEFAULT_SIDE_SIZE}
         ?visible=${this._visible}
         .sections=${this.sections}
         .collapsed=${this._layout.collapsed}
         .layoutEpoch=${this._layoutEpoch}
+        .maximized=${this._maximized[this._layout.key] ?? null}
         emptyText=${emptyTextFor(this._activeSource)}
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
+        @dock-size-reset=${this._resetPanelSize}
         @dock-hide=${this._hidePanel}
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
         @pane-reorder=${this._onPaneReorder}
+        @pane-maximize=${this._onPaneMaximize}
         @pane-menu=${this._onPaneMenu}
         @inspector-reveal=${this._onReveal}
         @inspector-locate=${this._onLocate}
@@ -371,11 +392,11 @@ export class LogInspector extends LitElement {
     if (!source) {
       return;
     }
-    eventBus.emit('inspector:reveal', { source, eventIndex: e.detail.eventIndex });
+    eventBus.emit('inspector:reveal', { source, eventId: e.detail.eventId });
     // Without a selection the sections are the whole-log ones, which have no
     // frame to follow; the whole-log rows only reveal.
     if (this._scopedSelection(source)) {
-      this._active.set(source, { kind: 'event', eventIndex: e.detail.eventIndex });
+      this._active.set(source, { kind: 'event', eventId: e.detail.eventId });
       this._scheduleRebuild();
     }
   };
@@ -389,16 +410,16 @@ export class LogInspector extends LitElement {
     if (!source) {
       return;
     }
-    this._locatedSource = e.detail.eventIndexes.length ? source : undefined;
+    this._locatedSource = e.detail.eventIds.length ? source : undefined;
     eventBus.emit('inspector:locate', {
       source,
-      eventIndexes: e.detail.eventIndexes,
+      eventIds: e.detail.eventIds,
       sticky: e.detail.sticky,
     });
     if (!e.detail.sticky || !this._scopedSelection(source)) {
       return;
     }
-    if (!e.detail.eventIndexes.length) {
+    if (!e.detail.eventIds.length) {
       // The pick is being dropped, which hands Details back to the tab's own
       // selection.
       if (this._active.delete(source)) {
@@ -419,7 +440,7 @@ export class LogInspector extends LitElement {
     if (this._locatedSource) {
       eventBus.emit('inspector:locate', {
         source: this._locatedSource,
-        eventIndexes: [],
+        eventIds: [],
         sticky: true,
       });
       this._locatedSource = undefined;
@@ -521,10 +542,23 @@ export class LogInspector extends LitElement {
   // `dock-resize` fires once on pointer-up, so this write already lands on
   // interaction-end — no debounce needed.
   private _onDockResize = (e: CustomEvent<{ size: number }>) => {
-    this._userAdjusted = true;
-    this.panelSize = e.detail.size;
-    updateSetting('inspector.size', this.panelSize);
+    this._setPanelSize(e.detail.size);
   };
+
+  private _resetPanelSize = () => {
+    this._setPanelSize(null);
+  };
+
+  private _setPanelSize(size: number | null): void {
+    this._userAdjusted = true;
+    if (this.dock === 'bottom') {
+      this.bottomPanelSize = size;
+      updateSetting('inspector.bottomSize', size);
+    } else {
+      this.sidePanelSize = size;
+      updateSetting('inspector.sideSize', size);
+    }
+  }
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
     this._userAdjusted = true;
@@ -550,9 +584,18 @@ export class LogInspector extends LitElement {
     this._applyLayout();
   };
 
+  private _onPaneMaximize = (e: CustomEvent<{ maximized: string | null }>) => {
+    this._maximized = { ...this._maximized, [this._layout.key]: e.detail.maximized };
+  };
+
   /** Offers every section of the list, hidden ones included, so any can come back. */
-  private _onPaneMenu = (e: CustomEvent<{ x: number; y: number }>) => {
-    this._menu?.show(this._sectionMenuItems(), e.detail.x, e.detail.y);
+  private _onPaneMenu = (e: CustomEvent<{ x: number; y: number; opener?: HTMLElement }>) => {
+    const { x, y, opener } = e.detail;
+    if (opener && this._menu?.isOpenFrom(opener)) {
+      this._menu.hide();
+      return;
+    }
+    this._menu?.show(this._sectionMenuItems(), x, y, opener);
   };
 
   /** The menu stays open through a toggle, so its ticks are refreshed in place. */
@@ -571,6 +614,10 @@ export class LogInspector extends LitElement {
       this._resetSections();
       return;
     }
+    if (e.detail.itemId === RESET_SIZE_ID) {
+      this._resetPanelSize();
+      return;
+    }
     const id = sectionIdFor(e.detail.itemId);
     if (id) {
       void this._toggleSection(id);
@@ -586,6 +633,10 @@ export class LogInspector extends LitElement {
       delete hidden[key];
     } else {
       hidden[key] = true;
+      // Else showing it again would maximize it unasked.
+      if (this._maximized[this._layout.key] === id) {
+        this._maximized = { ...this._maximized, [this._layout.key]: null };
+      }
     }
     this.hiddenSections = hidden;
     updateSetting('inspector.hiddenSections', this.hiddenSections);
@@ -597,13 +648,14 @@ export class LogInspector extends LitElement {
 
   /**
    * This list back to its defaults: the order it is built in, every section
-   * showing, and the panes' sizes automatic again. Collapse is left alone — it is
-   * a live reading choice, and one click undoes it.
+   * showing and none maximized, and the panes' sizes automatic again. Collapse
+   * is left alone — it is a live reading choice, and one click undoes it.
    */
   private _resetSections(): void {
     this._userAdjusted = true;
     const { [this._layout.key]: _cleared, ...order } = this.sectionOrder;
     this.sectionOrder = order;
+    this._maximized = { ...this._maximized, [this._layout.key]: null };
     const hadHidden = this._layout.hidden.size > 0;
     this.hiddenSections = withoutScope(this.hiddenSections, this._layout.key);
     updateSetting('inspector.sectionOrder', this.sectionOrder);

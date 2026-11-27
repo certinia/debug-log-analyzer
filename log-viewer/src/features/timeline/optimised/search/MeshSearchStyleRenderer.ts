@@ -23,7 +23,7 @@
 import type { Container } from 'pixi.js';
 import type { PixelBucket, RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
-import type { MatchedEventInfo } from '../../types/search.types.js';
+import type { MatchSpan, RowSet } from '../../types/search.types.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 import { MeshRectangleWriter } from '../rendering/MeshRectangleWriter.js';
@@ -48,18 +48,18 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
    * Buckets: search-aware styling based on matched events
    *
    * @param culledRects - Rectangles grouped by category (from RectangleCache)
-   * @param matchedEventIds - Set of event IDs that match search (retain original colors)
+   * @param matchedRows - Rows that match the search (retain original colors)
    * @param buckets - Aggregated pixel buckets grouped by category
    * @param viewport - Current viewport state for coordinate transforms
-   * @param matchedEventsInfo - Lightweight info about matched events for bucket highlighting
+   * @param matchedSpans - Where the matched frames sit, for bucket highlighting
    * @param litCategories - Categories whose every frame keeps its colour, as if matched
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
-    matchedEventIds: ReadonlySet<string>,
+    matchedRows: RowSet,
     buckets: Map<string, PixelBucket[]> = new Map(),
     viewport?: ViewportState,
-    matchedEventsInfo: ReadonlyArray<MatchedEventInfo> = [],
+    matchedSpans: ReadonlyArray<MatchSpan> = [],
     litCategories: ReadonlySet<string> = NO_CATEGORIES,
   ): void {
     const viewportTransform = this.beginFrame(culledRects, buckets, viewport);
@@ -85,7 +85,7 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
       const categoryLit = litCategories.has(category);
 
       for (const rect of rectangles) {
-        const color = categoryLit || matchedEventIds.has(rect.id) ? originalColor : greyColor;
+        const color = categoryLit || matchedRows.has(rect.row) ? originalColor : greyColor;
 
         const x = rect.x + halfGap;
         const y = rect.y + halfGap;
@@ -99,9 +99,8 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
       }
     }
 
-    // A bucket's colour comes from the matches inside it, by time range: `eventRefs` is
-    // empty on a memory-optimised bucket.
-    const matchIndex = buildMatchIndex(matchedEventsInfo);
+    // A bucket's colour comes from the matches inside it, by time range.
+    const matchIndex = buildMatchIndex(matchedSpans);
     rectIndex = this.writeBuckets(
       buckets,
       rectIndex,

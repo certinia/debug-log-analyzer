@@ -3,7 +3,7 @@
  */
 import '#vscode-elements/vscode-icon.js';
 
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
@@ -11,6 +11,9 @@ import { globalStyles } from '../styles/global.styles.js';
 import type { FilterRange } from './grid/MinMax.js';
 
 let nextId = 0;
+
+const sameRange = (a: FilterRange, b: FilterRange | undefined): boolean =>
+  a.start === b?.start && a.end === b?.end;
 
 /**
  * Min/max range control for the datagrid filter bar's `filters` slot — a pill
@@ -27,6 +30,12 @@ export class DatagridRangeFilter extends LitElement {
   /** Reactive mirror of the native `slot` attribute so the element re-renders
    *  when `<overflow-list>` moves it into (`overflow`) / out of its popover. */
   @property({ attribute: 'slot' }) slot = '';
+  /** The range on show. A host that binds it owns the value; setting it reports no change. */
+  @property({
+    attribute: false,
+    hasChanged: (value: FilterRange, old?: FilterRange) => !sameRange(value, old),
+  })
+  range: FilterRange = { start: null, end: null };
 
   @state() private _start: string = '';
   @state() private _end: string = '';
@@ -54,7 +63,7 @@ export class DatagridRangeFilter extends LitElement {
         display: grid;
         grid-template-columns: var(--filter-panel-label-width) 1fr;
         align-items: center;
-        column-gap: 8px;
+        column-gap: var(--lana-space-sm);
       }
 
       .range-panel__label {
@@ -68,7 +77,7 @@ export class DatagridRangeFilter extends LitElement {
         grid-column: 2;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--lana-space-xs);
       }
 
       .range-panel__unit {
@@ -86,8 +95,8 @@ export class DatagridRangeFilter extends LitElement {
 
       .range-popover {
         position-area: bottom span-left;
-        margin: 6px 0 0 0;
-        padding: 8px;
+        margin: var(--lana-space-xs) 0 0 0;
+        padding: var(--lana-space-sm);
       }
 
       /* Flex layout only while open — a class-level display would beat the UA
@@ -96,19 +105,19 @@ export class DatagridRangeFilter extends LitElement {
       .range-popover:popover-open {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--lana-space-xs);
       }
 
       .range-popover__inputs {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--lana-space-xs);
       }
 
       .range-popover__input {
         width: 8ch;
         box-sizing: border-box;
-        padding: 3px 6px;
+        padding: var(--lana-space-3xs) var(--lana-space-xs);
         font: inherit;
         font-size: var(--lana-text-base);
         color: var(--vscode-settings-numberInputForeground);
@@ -131,7 +140,7 @@ export class DatagridRangeFilter extends LitElement {
 
       .range-popover__clear {
         align-self: flex-start;
-        padding: 2px 0;
+        padding: var(--lana-space-3xs) 0;
         border: none;
         background: none;
         color: var(--lana-link-fg);
@@ -145,6 +154,15 @@ export class DatagridRangeFilter extends LitElement {
       }
     `,
   ];
+
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    // A host echoing what was typed would turn "1.50" into "1.5" mid-edit.
+    if (changed.has('range') && !sameRange(this.range, this._typed())) {
+      this._cancelPending();
+      this._start = this.range.start === null ? '' : String(this.range.start);
+      this._end = this.range.end === null ? '' : String(this.range.end);
+    }
+  }
 
   render() {
     return this.slot === 'overflow' ? this._renderPanel() : this._renderInline();
@@ -163,7 +181,7 @@ export class DatagridRangeFilter extends LitElement {
         style="anchor-name:${this._anchorName}"
         popovertarget=${this._popoverId}
         aria-haspopup="dialog"
-        title=${this.label}
+        title="Filter by ${this.label}"
       >
         <span>${summary}</span>
         <vscode-icon
@@ -219,6 +237,7 @@ export class DatagridRangeFilter extends LitElement {
         .value=${this._start}
         @input=${this._onInput}
         @keydown=${this._onKeydown}
+        @blur=${this._flush}
       />
       <input
         type="number"
@@ -227,6 +246,7 @@ export class DatagridRangeFilter extends LitElement {
         .value=${this._end}
         @input=${this._onInput}
         @keydown=${this._onKeydown}
+        @blur=${this._flush}
       />
     </div>`;
   }
@@ -237,33 +257,47 @@ export class DatagridRangeFilter extends LitElement {
     this._end = inputs[1]?.value ?? '';
     event.stopPropagation();
     clearTimeout(this._debounceHandle);
-    this._debounceHandle = setTimeout(() => this._emit(), 150);
+    this._debounceHandle = setTimeout(() => this._flush(), 150);
   }
 
   private _onKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
-      clearTimeout(this._debounceHandle);
-      this._emit();
+      this._flush();
       (event.target as HTMLInputElement).blur();
     }
   }
 
-  private _clear(): void {
+  // On blur too: a host that resets the range while input is pending would see no change, and the input would come back.
+  private _flush(): void {
+    if (this._debounceHandle !== undefined) {
+      this._cancelPending();
+      this._emit();
+    }
+  }
+
+  private _cancelPending(): void {
     clearTimeout(this._debounceHandle);
+    this._debounceHandle = undefined;
+  }
+
+  private _clear(): void {
+    this._cancelPending();
     this._start = '';
     this._end = '';
     this._emit();
   }
 
+  private _typed(): FilterRange {
+    return {
+      start: this._start !== '' ? +this._start : null,
+      end: this._end !== '' ? +this._end : null,
+    };
+  }
+
   private _emit(): void {
     this.dispatchEvent(
       new CustomEvent<{ range: FilterRange }>('datagrid-range-change', {
-        detail: {
-          range: {
-            start: this._start !== '' ? +this._start : null,
-            end: this._end !== '' ? +this._end : null,
-          },
-        },
+        detail: { range: this._typed() },
         bubbles: true,
         composed: true,
       }),

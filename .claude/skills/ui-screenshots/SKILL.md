@@ -34,6 +34,9 @@ The log is `lana/test/playwright/fixtures/apex-log.log`. It is small: Time Order
    Run outside the sandbox (`dangerouslyDisableSandbox: true`). Skip the build when it is fresh:
    `pnpm exec playwright test --config=lana/test/playwright/playwright.config.shots.ts --retries=0`.
 
+   Prefix `CI=true` in a worktree. Without it, Playwright reuses any server already on port 3001,
+   which can serve another checkout's build.
+
 3. Read every PNG. A blank or half-drawn frame is a failure, not a shot.
 4. For a PR, reference each file in the body and attach it. `gh` uploads it and rewrites the link:
 

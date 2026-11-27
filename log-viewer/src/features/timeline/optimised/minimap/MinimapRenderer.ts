@@ -26,7 +26,7 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { formatDuration, formatTimeRange, sameMembers } from '../../../../core/utility/Util.js';
+import { formatDuration, formatTimeRange, sameMembers } from '#core/utility/Util.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import {
   MARKER_ALPHA_BY_TYPE,
@@ -264,7 +264,7 @@ export class MinimapRenderer {
       border-radius: 4px;
       background: var(--tl-widget-background, #252526);
       border: 1px solid var(--tl-widget-border, #454545);
-      color: #e3e3e3;
+      color: var(--tl-widget-foreground, #cccccc);
       font-family: var(--lana-font-mono);
       font-size: var(--lana-text-xs);
       font-weight: lighter;

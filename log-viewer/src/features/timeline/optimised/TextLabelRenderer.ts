@@ -38,8 +38,8 @@ export class TextLabelRenderer {
   /** Container for all text labels */
   private container: Container;
 
-  /** Labels keyed by rectangle ID (created lazily, never destroyed) */
-  private labels: Map<string, BitmapText> = new Map();
+  /** Labels keyed by row (created lazily, never destroyed) */
+  private labels: Map<number, BitmapText> = new Map();
 
   /** Whether the font has been loaded/created */
   private fontReady = false;
@@ -47,12 +47,17 @@ export class TextLabelRenderer {
   /** Batch color data for contrast calculation */
   private batches: Map<string, RenderBatch> | null = null;
 
+  /** The label for a rect's row. */
+  readonly labelOf: (row: number) => string;
+
   /**
    * Create a new TextLabelRenderer.
    *
    * @param parentContainer - The worldContainer to add labels to
+   * @param labelOf - The label for a rect's row
    */
-  constructor(parentContainer: Container) {
+  constructor(parentContainer: Container, labelOf: (row: number) => string) {
+    this.labelOf = labelOf;
     this.container = new Container();
     this.container.zIndex = TEXT_LABEL_CONSTANTS.Z_INDEX;
     this.container.label = 'TextLabelRenderer';
@@ -132,7 +137,7 @@ export class TextLabelRenderer {
           continue;
         }
 
-        const text = rect.eventRef.text;
+        const text = this.labelOf(rect.row);
         if (!text) {
           continue;
         }
@@ -160,7 +165,7 @@ export class TextLabelRenderer {
         }
 
         // Lazy create: get existing or create new label
-        let label = this.labels.get(rect.id);
+        let label = this.labels.get(rect.row);
         if (!label) {
           label = new BitmapText({
             text: '',
@@ -172,7 +177,7 @@ export class TextLabelRenderer {
           // Compensate for worldContainer Y-axis inversion
           label.scale.y = -1;
           this.container.addChild(label);
-          this.labels.set(rect.id, label);
+          this.labels.set(rect.row, label);
         }
 
         // Update label

@@ -9,8 +9,10 @@ import './styles/tokens.css';
 
 // web components
 import './features/app/LogViewer';
+import { watchUiMode } from './features/settings/uiMode.js';
 
 function onInit(): void {
+  watchUiMode();
   render(html`<log-viewer></log-viewer>`, document.body);
 }
 

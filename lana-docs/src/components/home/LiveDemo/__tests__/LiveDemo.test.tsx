@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
@@ -123,6 +123,47 @@ it('closes the demo and shows the poster again', async () => {
 
   expect(frame()).toBeNull();
   expect(button('Open demo')).toBeDefined();
+});
+
+describe('full screen', () => {
+  const requestFullscreen = jest.fn();
+
+  beforeEach(() => {
+    // jsdom has no Fullscreen API.
+    Element.prototype.requestFullscreen = requestFullscreen as never;
+    requestFullscreen.mockClear();
+  });
+
+  it('expands within the browser window instead of taking over the screen', async () => {
+    render();
+    await click(button('Open demo'));
+
+    await click(button('Full screen'));
+
+    expect(requestFullscreen).not.toHaveBeenCalled();
+    expect(button('Exit full screen').getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('returns to the page from Exit full screen', async () => {
+    render();
+    await click(button('Open demo'));
+    await click(button('Full screen'));
+
+    await click(button('Exit full screen'));
+
+    expect(button('Full screen').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('reopens at page size after closing in full screen', async () => {
+    render();
+    await click(button('Open demo'));
+    await click(button('Full screen'));
+
+    await click(button('Close demo'));
+    await click(button('Open demo'));
+
+    expect(button('Full screen').getAttribute('aria-expanded')).toBe('false');
+  });
 });
 
 it('keeps the poster and gives the build steps in dev when the demo is not built', async () => {

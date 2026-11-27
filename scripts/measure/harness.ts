@@ -41,6 +41,9 @@ function retainedMb(): number {
 /** Fractional milliseconds: a density query lands under 10ms, a cached one under 0.1ms. */
 export const nowMs = (): number => Number(process.hrtime.bigint()) / 1e6;
 
+/** Resolves at once, so a sliced build measures its work, not the frames it hands back on screen. */
+export const yieldSlice = (): Promise<void> => Promise.resolve();
+
 /** Two decimals, in `report`'s number column: a cached query lands under 0.1ms. */
 export const ms = (value: number): string => value.toFixed(2).padStart(MS_WIDTH);
 

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { sharePercent } from '../core/utility/Util.js';
+import { sharePercent } from '#core/utility/Util.js';
 import type {
   HeatStripTimeSeries,
   NoDataSpan,

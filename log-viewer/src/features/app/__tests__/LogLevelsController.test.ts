@@ -2,31 +2,35 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog, DebugLevels } from '@apexdevtools/apex-log-parser';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
-jest.mock('../../../core/log/levelFilter.js', () => ({
-  ...jest.requireActual<object>('../../../core/log/levelFilter.js'),
-  filterByLevels: (log: ApexLog, chosen: DebugLevels, options: { signal: AbortSignal }) =>
+import type { DebugLevels } from '#core/log/levelFilter.js';
+import type { LogStore } from '#core/log/LogStore.js';
+
+jest.mock('#core/log/LogStore.js', () => ({
+  ...jest.requireActual<object>('#core/log/LogStore.js'),
+  filterByLevels: (log: LogStore, chosen: DebugLevels, options: { signal: AbortSignal }) =>
     new Promise((resolve, reject) => builds.push({ log, chosen, options, resolve, reject })),
 }));
 
 import { LogLevelsController } from '../LogLevelsController.js';
 
 interface Build {
-  log: ApexLog;
+  log: LogStore;
   chosen: DebugLevels;
   options: { signal: AbortSignal };
-  resolve: (log: ApexLog | null) => void;
+  resolve: (log: LogStore | null) => void;
   reject: (err: unknown) => void;
 }
 
 let builds: Build[] = [];
 
-const captured = { debugLevels: { apexCode: 'FINE', database: 'FINE' } } as unknown as ApexLog;
+const captured = {
+  log: { debugLevels: { apexCode: 'FINE', database: 'FINE' } },
+} as unknown as LogStore;
 
 function setUp() {
-  const published: ApexLog[] = [];
+  const published: LogStore[] = [];
   const failed: unknown[] = [];
   const controllers: ReactiveController[] = [];
   const host = {
@@ -68,7 +72,7 @@ describe('LogLevelsController', () => {
   it('puts the log filtered to the chosen levels on screen', async () => {
     const { levels, published } = setUp();
     levels.open(captured);
-    const filtered = {} as ApexLog;
+    const filtered = {} as LogStore;
 
     const done = levels.choose('apexCode', 'DEBUG');
     builds[0]!.resolve(filtered);
@@ -81,7 +85,7 @@ describe('LogLevelsController', () => {
   it('stops a build that a second pick overtook, and keeps both picks', async () => {
     const { levels, published } = setUp();
     levels.open(captured);
-    const filtered = {} as ApexLog;
+    const filtered = {} as LogStore;
 
     const first = levels.choose('apexCode', 'DEBUG');
     const second = levels.choose('database', 'ERROR');
@@ -97,7 +101,7 @@ describe('LogLevelsController', () => {
   it('goes back to the levels on screen when a build fails', async () => {
     const { levels, published, failed } = setUp();
     levels.open(captured);
-    const filtered = {} as ApexLog;
+    const filtered = {} as LogStore;
     const applied = levels.choose('apexCode', 'DEBUG');
     builds[0]!.resolve(filtered);
     await applied;
@@ -122,7 +126,7 @@ describe('LogLevelsController', () => {
     jest.advanceTimersByTime(100);
     expect(levels.busy).toBe(true);
 
-    builds[0]!.resolve({} as ApexLog);
+    builds[0]!.resolve({} as LogStore);
     await done;
     expect(levels.busy).toBe(false);
   });
@@ -140,7 +144,7 @@ describe('LogLevelsController', () => {
   it('puts the captured log back on screen on reset', async () => {
     const { levels, published } = setUp();
     levels.open(captured);
-    const filtered = {} as ApexLog;
+    const filtered = {} as LogStore;
     const done = levels.choose('apexCode', 'DEBUG');
     builds[0]!.resolve(filtered);
     await done;
