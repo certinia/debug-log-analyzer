@@ -27,6 +27,12 @@ updates:
       # VS Code version, not the latest Node release
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # 1.7.1 pins @playwright/test to exactly 1.60.0 and installs a second Playwright copy (#1297)
+      - dependency-name: '@salesforce/playwright-vscode-ext'
+        versions: ['1.7.1']
+      # must match the effect major that @salesforce/vscode-services uses at runtime (#1279)
+      - dependency-name: 'effect'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
