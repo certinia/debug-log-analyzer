@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- 🎚️ **Log levels filters**: each level in the header dropdowns says what it adds to the log, such as Methods for `APEX_CODE` `FINE`. ([#530])
+
+### Fixed
+
+- 🔽 **Dropdowns**: the highlight follows the pointer over an option's text, not only its edges.
+- 🎚️ **Log levels filters**: Enter no longer picks a level the log was not captured at.
+
 ## [1.24.1] - 2026-11-19
 
 ### Fixed
