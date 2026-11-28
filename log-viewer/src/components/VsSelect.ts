@@ -415,6 +415,7 @@ export class VsSelect extends VscodeSingleSelect {
             };
             return html`
               <li
+                aria-description=${ifDefined(op.description || undefined)}
                 aria-disabled=${ifDefined(op.disabled ? 'true' : undefined)}
                 aria-selected=${selected ? 'true' : 'false'}
                 class=${classMap(optionClasses)}
