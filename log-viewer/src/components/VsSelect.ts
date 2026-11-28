@@ -123,6 +123,13 @@ export const selectSizingStyles = css`
     white-space: normal;
   }
 
+  /* The vendor moves the highlight only when the row itself is under the pointer. */
+  .option-check,
+  .option-label,
+  .option-hint {
+    pointer-events: none;
+  }
+
   /* Row highlight is the same calm grey as every other filter-bar popover row
      — the base vendor style uses the blue list-active-selection token here,
      which is the one place blue leaked into the shared popover family.
@@ -345,6 +352,13 @@ export class VsSelect extends VscodeSingleSelect {
     const row = (event.target as Element).closest<HTMLElement>('li.option:not(.disabled)');
     if (!this._deselect(Number(row?.dataset.index))) {
       super._onOptionClick(event);
+    }
+  }
+
+  // A disabled row must not go active: Enter would pick it, and the foot would show its description.
+  protected override _onOptionMouseOver(event: MouseEvent): void {
+    if (!(event.target as Element).matches('.disabled')) {
+      super._onOptionMouseOver(event);
     }
   }
 
