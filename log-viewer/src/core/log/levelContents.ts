@@ -20,8 +20,8 @@ export const LEVEL_ADDS: Readonly<Record<DebugCategory, Readonly<Partial<Record<
     },
     apexProfiling: {
       INFO: 'Governor limits',
-      FINE: 'Profiling summary, variables',
-      FINEST: 'Limit usage',
+      FINE: 'Profiling summary, variable lists',
+      FINEST: 'Per-statement limit usage, referenced objects',
     },
     callout: {
       ERROR: 'External data errors',
