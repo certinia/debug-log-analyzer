@@ -126,18 +126,32 @@ describe('log-levels', () => {
     expect(asked).toBe(1);
   });
 
-  it('says what each level adds', async () => {
-    const el = await mount({ apexCode: 'FINE' }, { apexCode: 'FINE' });
+  it('describes each level that adds events, and no other', async () => {
+    const el = await mount({ database: 'FINEST' }, { database: 'FINEST' });
 
-    const finest = options(el).find((option) => option.getAttribute('value') === 'FINEST');
-    expect(finest?.getAttribute('description')).toBe('Variables');
+    const described = Object.fromEntries(
+      options(el).map((option) => [
+        option.getAttribute('value'),
+        Boolean(option.getAttribute('description')),
+      ]),
+    );
+    expect(described).toEqual({
+      NONE: false,
+      ERROR: false,
+      WARN: true,
+      INFO: true,
+      DEBUG: false,
+      FINE: true,
+      FINER: false,
+      FINEST: true,
+    });
   });
 
-  it('says nothing for a level that adds nothing', async () => {
+  it('says APEX_CODE FINE adds methods', async () => {
     const el = await mount({ apexCode: 'FINE' }, { apexCode: 'FINE' });
 
-    const warn = options(el).find((option) => option.getAttribute('value') === 'WARN');
-    expect(warn?.hasAttribute('description')).toBe(false);
+    const fine = options(el).find((option) => option.getAttribute('value') === 'FINE');
+    expect(fine?.getAttribute('description')).toBe('Methods');
   });
 
   it('names the captured level in each dropdown', async () => {
