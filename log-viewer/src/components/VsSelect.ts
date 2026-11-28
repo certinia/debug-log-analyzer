@@ -123,6 +123,13 @@ export const selectSizingStyles = css`
     white-space: normal;
   }
 
+  /* The vendor moves the highlight only when the row itself is under the pointer. */
+  .option-check,
+  .option-label,
+  .option-hint {
+    pointer-events: none;
+  }
+
   /* Row highlight is the same calm grey as every other filter-bar popover row
      — the base vendor style uses the blue list-active-selection token here,
      which is the one place blue leaked into the shared popover family.
@@ -246,6 +253,12 @@ export const selectSizingStyles = css`
     padding-left: var(--lana-space-md);
     color: var(--lana-fg-muted);
   }
+
+  /* The popup hugs its widest option, so the description wraps to that width rather than set it. */
+  .description {
+    contain: inline-size;
+    font-size: var(--filter-popover-row-font-size);
+  }
 `;
 
 /** vscode-single-select where the control fits the selected value and the popup its widest option. */
@@ -342,6 +355,13 @@ export class VsSelect extends VscodeSingleSelect {
     }
   }
 
+  // A disabled row must not go active: Enter would pick it, and the foot would show its description.
+  protected override _onOptionMouseOver(event: MouseEvent): void {
+    if (!(event.target as Element).matches('.disabled')) {
+      super._onOptionMouseOver(event);
+    }
+  }
+
   protected override _onEnterKeyDown(event: KeyboardEvent): void {
     if (!this.open || !this._deselect(this._opts.activeIndex)) {
       super._onEnterKeyDown(event);
@@ -395,6 +415,7 @@ export class VsSelect extends VscodeSingleSelect {
             };
             return html`
               <li
+                aria-description=${ifDefined(op.description || undefined)}
                 aria-disabled=${ifDefined(op.disabled ? 'true' : undefined)}
                 aria-selected=${selected ? 'true' : 'false'}
                 class=${classMap(optionClasses)}

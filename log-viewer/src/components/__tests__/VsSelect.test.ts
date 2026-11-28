@@ -26,6 +26,10 @@ const TYPES = ['All', 'DML_BEGIN', 'METHOD_ENTRY', 'METHOD_EXIT'];
 async function mount(
   attrs: Record<string, string> = {},
   selected = 'All',
+  {
+    disabled = [],
+    descriptions = {},
+  }: { disabled?: string[]; descriptions?: Record<string, string> } = {},
 ): Promise<{ el: VsSelect; changes: string[] }> {
   const el = document.createElement('vs-select') as VsSelect;
   for (const [name, value] of Object.entries(attrs)) {
@@ -35,6 +39,8 @@ async function mount(
     const option = document.createElement('vscode-option');
     option.textContent = type;
     option.selected = type === selected;
+    option.disabled = disabled.includes(type);
+    option.description = descriptions[type] ?? '';
     el.append(option);
   }
   document.body.append(el);
@@ -108,5 +114,45 @@ describe('vs-select deselectValue', () => {
     await pick(el, 'DML_BEGIN');
 
     expect(el.value).toBe('DML_BEGIN');
+  });
+});
+
+describe('vs-select hover', () => {
+  async function hoverThenEnter(label: string): Promise<string> {
+    const { el } = await mount({}, 'DML_BEGIN', { disabled: ['METHOD_EXIT'] });
+    el.open = true;
+    await el.updateComplete;
+
+    option(el, label).dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await el.updateComplete;
+    return el.value;
+  }
+
+  it('picks the hovered option on Enter', async () => {
+    expect(await hoverThenEnter('METHOD_ENTRY')).toBe('METHOD_ENTRY');
+  });
+
+  it('ignores a hover on a disabled option, so Enter keeps the selection', async () => {
+    expect(await hoverThenEnter('METHOD_EXIT')).toBe('DML_BEGIN');
+  });
+});
+
+describe('vs-select descriptions', () => {
+  it('gives each option its description for screen readers, and none to an option without one', async () => {
+    const { el } = await mount({}, 'All', { descriptions: { DML_BEGIN: 'Inserts and updates' } });
+    el.open = true;
+    await el.updateComplete;
+
+    expect(
+      Object.fromEntries(
+        TYPES.map((type) => [type, option(el, type).getAttribute('aria-description')]),
+      ),
+    ).toEqual({
+      All: null,
+      DML_BEGIN: 'Inserts and updates',
+      METHOD_ENTRY: null,
+      METHOD_EXIT: null,
+    });
   });
 });
